@@ -1,0 +1,21 @@
+{
+  "name": "Building.Editor",
+  "rootNamespace": "Worldforge.Building.Editor",
+  "references": [
+    "Building",
+    "Item.Editor",
+    "Inventory.Editor",
+    "Core.Editor"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

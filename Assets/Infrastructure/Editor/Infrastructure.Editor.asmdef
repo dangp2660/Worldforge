@@ -1,0 +1,19 @@
+{
+  "name": "Infrastructure.Editor",
+  "rootNamespace": "Worldforge.Infrastructure.Editor",
+  "references": [
+    "Infrastructure",
+    "Core.Editor"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

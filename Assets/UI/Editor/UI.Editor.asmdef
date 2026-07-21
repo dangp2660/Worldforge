@@ -1,0 +1,22 @@
+{
+  "name": "UI.Editor",
+  "rootNamespace": "Worldforge.UI.Editor",
+  "references": [
+    "UI",
+    "Character.Editor",
+    "Inventory.Editor",
+    "Item.Editor",
+    "Core.Editor"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

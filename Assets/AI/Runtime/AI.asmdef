@@ -1,0 +1,17 @@
+{
+  "name": "AI",
+  "rootNamespace": "Worldforge.AI",
+  "references": [
+    "Core",
+    "Creature"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

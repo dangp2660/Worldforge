@@ -1,0 +1,19 @@
+{
+  "name": "Exploration.Editor",
+  "rootNamespace": "Worldforge.Exploration.Editor",
+  "references": [
+    "Exploration",
+    "Core.Editor"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

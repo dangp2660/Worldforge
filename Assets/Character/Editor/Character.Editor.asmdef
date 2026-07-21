@@ -1,0 +1,19 @@
+{
+  "name": "Character.Editor",
+  "rootNamespace": "Worldforge.Character.Editor",
+  "references": [
+    "Character",
+    "Core.Editor"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

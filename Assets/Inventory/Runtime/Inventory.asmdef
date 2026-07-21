@@ -1,0 +1,17 @@
+{
+  "name": "Inventory",
+  "rootNamespace": "Worldforge.Inventory",
+  "references": [
+    "Core",
+    "Item"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}
