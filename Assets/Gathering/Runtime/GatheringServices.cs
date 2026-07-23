@@ -85,12 +85,27 @@ namespace Worldforge.Gathering.Services
         {
             context.Services.Resolve<IInventoryService>();
             context.Services.Resolve<IGatheringService>();
+            context.RegisterSaveOperation(
+                "Gameplay.Gathering.SaveRuntimeData",
+                currentContext => currentContext.RecordRuntimeState("gathering.serviceLifetime", ServiceLifetime.Transient.ToString()),
+                110);
+            context.RegisterRuntimeResource("Gameplay.Gathering.RuntimeCache", new GatheringRuntimeCache());
 
             Debug.Log("[Worldforge] Gathering gameplay module initialized.");
         }
 
         public void Shutdown(ApplicationBootstrapContext context)
         {
+        }
+    }
+
+    internal sealed class GatheringRuntimeCache : IDisposable
+    {
+        public bool IsDisposed { get; private set; }
+
+        public void Dispose()
+        {
+            IsDisposed = true;
         }
     }
 }

@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
-using Worldforge.Core.Bootstrap;
+using System.Globalization;
 using UnityEngine;
+using UnityEngine.SceneManagement;
+using Worldforge.Core.Bootstrap;
 
 namespace Worldforge.Inventory.Services
 {
@@ -81,6 +83,8 @@ namespace Worldforge.Inventory.Services
     {
         private static readonly IReadOnlyList<string> DependenciesList = new[] { "Input", "SceneFlow" };
 
+        private GameObject runtimeRoot;
+
         public string Name
         {
             get { return "Gameplay.Inventory"; }
@@ -105,11 +109,43 @@ namespace Worldforge.Inventory.Services
         {
             context.Services.Resolve<IInventoryService>();
 
+            runtimeRoot = new GameObject("Worldforge.Inventory.RuntimeRoot")
+            {
+                hideFlags = HideFlags.HideAndDontSave
+            };
+
+            context.RegisterTemporaryObject("Gameplay.Inventory.RuntimeRoot", runtimeRoot);
+            context.RegisterSaveOperation("Gameplay.Inventory.SaveRuntimeData", SaveRuntimeData, 100);
+
+            SceneManager.activeSceneChanged -= OnActiveSceneChanged;
+            SceneManager.activeSceneChanged += OnActiveSceneChanged;
+            context.RegisterEventSubscription(
+                "Gameplay.Inventory.ActiveSceneChanged",
+                () => SceneManager.activeSceneChanged -= OnActiveSceneChanged,
+                100);
+
             Debug.Log("[Worldforge] Inventory gameplay module initialized.");
         }
 
         public void Shutdown(ApplicationBootstrapContext context)
         {
+            runtimeRoot = null;
+        }
+
+        private static void SaveRuntimeData(ApplicationBootstrapContext context)
+        {
+            var inventoryService = context.Services.Resolve<IInventoryService>();
+            context.RecordRuntimeState(
+                "inventory.registeredContainerCount",
+                inventoryService.RegisteredContainerCount.ToString(CultureInfo.InvariantCulture));
+        }
+
+        private static void OnActiveSceneChanged(Scene previousScene, Scene nextScene)
+        {
+            Debug.LogFormat(
+                "[Worldforge] Inventory runtime observed active scene change: '{0}' -> '{1}'.",
+                previousScene.path,
+                nextScene.path);
         }
     }
 }

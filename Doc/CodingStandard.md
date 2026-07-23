@@ -652,6 +652,12 @@ Editor Tool sử dụng EditMode Test.
 
 Critical System phải có Regression Test.
 
+Mọi thay đổi triển khai phải chạy tập kiểm thử phù hợp trước khi bàn giao.
+
+Phản hồi bàn giao phải nêu rõ phạm vi test đã chạy, trạng thái pass/fail và đường dẫn artifact kiểm thử khi có.
+
+Structured artifact dạng JSON phải được cung cấp khi tooling vận hành hiện có tạo được hoặc có wrapper chuẩn hóa kết quả.
+
 State Transition phải được Test.
 
 Ability Activation, Cancellation và Interruption phải được Test.
@@ -709,6 +715,10 @@ Không tồn tại God Class hoặc God Component.
 Unity Lifecycle được sử dụng đúng.
 
 Không tồn tại Update không cần thiết.
+
+Thay đổi đã được xác minh bằng test phù hợp trước khi bàn giao.
+
+Kết quả bàn giao có nêu rõ phạm vi test, trạng thái pass/fail và artifact kiểm thử liên quan.
 
 Event Lifetime được xử lý đúng.
 

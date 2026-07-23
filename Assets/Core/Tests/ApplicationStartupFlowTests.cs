@@ -127,6 +127,8 @@ namespace Worldforge.Core.Tests
                     "Gameplay.Gathering"
                 },
                 context.LoadedGameplayModules);
+
+            flow.Shutdown("TestCleanup");
         }
 
         [Test]
@@ -194,6 +196,47 @@ namespace Worldforge.Core.Tests
             Assert.AreSame(inventoryService, resolvedFromStatic);
         }
 
+        [Test]
+        public void Shutdown_ExecutesSaveCleanupReleaseAndDisposeInOrder()
+        {
+            ShutdownTrackingState.Reset();
+
+            var flow = new ApplicationStartupFlow(new ShutdownTrackingSystem());
+            var context = CreateContext();
+
+            flow.Initialize(context);
+
+            var snapshotStore = context.Services.Resolve<IApplicationShutdownSnapshotStore>();
+
+            flow.Shutdown("TestShutdown");
+            ShutdownTrackingEventSource.Raise();
+
+            CollectionAssert.AreEqual(
+                new[]
+                {
+                    "initialize:Test.ShutdownTracking",
+                    "save:Test.ShutdownTracking",
+                    "shutdown:Test.ShutdownTracking",
+                    "cleanup:Test.ShutdownTracking.Subscription",
+                    "dispose:Test.ShutdownTracking.Resource",
+                    "destroy:Test.ShutdownTracking.Temp",
+                    "dispose:Test.ShutdownTracking.Service"
+                },
+                ShutdownTrackingState.Events);
+            Assert.Zero(ShutdownTrackingState.SignalHandlerInvocations);
+            Assert.IsTrue(ShutdownTrackingState.WasTemporaryObjectDestroyed);
+            Assert.NotNull(snapshotStore.LastSavedSnapshot);
+            Assert.AreEqual("TestShutdown", snapshotStore.LastSavedSnapshot.shutdownReason);
+            Assert.NotNull(snapshotStore.LastSavedSnapshot.runtimeData);
+            Assert.That(
+                Array.Exists(
+                    snapshotStore.LastSavedSnapshot.runtimeData,
+                    entry => entry != null &&
+                             entry.key == "test.shutdownTrackingServiceState" &&
+                             entry.value == "alive"),
+                Is.True);
+        }
+
         private ApplicationBootstrapContext CreateContext()
         {
             managerObject = new GameObject("BootstrapManagerTests");
@@ -239,6 +282,156 @@ namespace Worldforge.Core.Tests
             public void Shutdown(ApplicationBootstrapContext context)
             {
                 events.Add("shutdown:" + Name);
+            }
+        }
+
+        private interface IShutdownTrackingService
+        {
+            string State { get; }
+        }
+
+        private sealed class ShutdownTrackingService : IShutdownTrackingService, IDisposable
+        {
+            private bool disposed;
+
+            public string State
+            {
+                get { return disposed ? "disposed" : "alive"; }
+            }
+
+            public void Dispose()
+            {
+                disposed = true;
+                ShutdownTrackingState.Events.Add("dispose:Test.ShutdownTracking.Service");
+            }
+        }
+
+        private sealed class ShutdownTrackingServiceRegistrationProvider : IServiceRegistrationProvider
+        {
+            public int Order
+            {
+                get { return 1000; }
+            }
+
+            public void RegisterServices(ApplicationBootstrapContext context, IServiceRegistry services)
+            {
+                services.AddSingleton<IShutdownTrackingService>(_ => new ShutdownTrackingService());
+            }
+        }
+
+        private sealed class ShutdownTrackingSystem : IApplicationSystem
+        {
+            public string Name
+            {
+                get { return "Test.ShutdownTracking"; }
+            }
+
+            public int Order
+            {
+                get { return 500; }
+            }
+
+            public ApplicationSystemCategory Category
+            {
+                get { return ApplicationSystemCategory.Core; }
+            }
+
+            public IReadOnlyList<string> Dependencies
+            {
+                get { return Array.Empty<string>(); }
+            }
+
+            public void Initialize(ApplicationBootstrapContext context)
+            {
+                ShutdownTrackingState.Events.Add("initialize:Test.ShutdownTracking");
+                context.Services.Resolve<IShutdownTrackingService>();
+
+                var temporaryObject = new GameObject("ShutdownTracking.Temp");
+                temporaryObject.AddComponent<ShutdownTrackingTemporaryObjectTracker>();
+                context.RegisterTemporaryObject("Test.ShutdownTracking.Temp", temporaryObject);
+
+                ShutdownTrackingEventSource.Signal += ShutdownTrackingState.OnSignal;
+                context.RegisterEventSubscription(
+                    "Test.ShutdownTracking.Subscription",
+                    () =>
+                    {
+                        ShutdownTrackingState.Events.Add("cleanup:Test.ShutdownTracking.Subscription");
+                        ShutdownTrackingEventSource.Signal -= ShutdownTrackingState.OnSignal;
+                    },
+                    10);
+
+                context.RegisterSaveOperation(
+                    "Test.ShutdownTracking.Save",
+                    currentContext =>
+                    {
+                        ShutdownTrackingState.Events.Add("save:Test.ShutdownTracking");
+                        var trackingService = currentContext.Services.Resolve<IShutdownTrackingService>();
+                        currentContext.RecordRuntimeState("test.shutdownTrackingServiceState", trackingService.State);
+                    },
+                    10);
+
+                context.RegisterRuntimeResource(
+                    "Test.ShutdownTracking.Resource",
+                    new TrackingDisposableResource());
+            }
+
+            public void Shutdown(ApplicationBootstrapContext context)
+            {
+                ShutdownTrackingState.Events.Add("shutdown:Test.ShutdownTracking");
+            }
+        }
+
+        private sealed class TrackingDisposableResource : IDisposable
+        {
+            public void Dispose()
+            {
+                ShutdownTrackingState.Events.Add("dispose:Test.ShutdownTracking.Resource");
+            }
+        }
+
+        private sealed class ShutdownTrackingTemporaryObjectTracker : MonoBehaviour
+        {
+            private void OnDestroy()
+            {
+                ShutdownTrackingState.Events.Add("destroy:Test.ShutdownTracking.Temp");
+                ShutdownTrackingState.WasTemporaryObjectDestroyed = true;
+            }
+        }
+
+        private static class ShutdownTrackingEventSource
+        {
+            public static event Action Signal;
+
+            public static void Raise()
+            {
+                Signal?.Invoke();
+            }
+
+            public static void Reset()
+            {
+                Signal = null;
+            }
+        }
+
+        private static class ShutdownTrackingState
+        {
+            public static List<string> Events { get; } = new List<string>();
+
+            public static int SignalHandlerInvocations { get; private set; }
+
+            public static bool WasTemporaryObjectDestroyed { get; set; }
+
+            public static void Reset()
+            {
+                Events.Clear();
+                SignalHandlerInvocations = 0;
+                WasTemporaryObjectDestroyed = false;
+                ShutdownTrackingEventSource.Reset();
+            }
+
+            public static void OnSignal()
+            {
+                SignalHandlerInvocations++;
             }
         }
     }

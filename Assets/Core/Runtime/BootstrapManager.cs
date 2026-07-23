@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Reflection;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -12,6 +13,7 @@ namespace Worldforge.Core.Bootstrap
         private ApplicationStartupFlow startupFlow;
         private ApplicationBootstrapContext bootstrapContext;
         private bool isInitialized;
+        private bool isShuttingDown;
 
         public static BootstrapManager Instance { get; private set; }
 
@@ -22,7 +24,7 @@ namespace Worldforge.Core.Bootstrap
 
         public IServiceResolver Services
         {
-            get { return bootstrapContext != null ? bootstrapContext.Services : null; }
+            get { return bootstrapContext?.Services; }
         }
 
         private void Awake()
@@ -39,7 +41,7 @@ namespace Worldforge.Core.Bootstrap
 
         private void OnApplicationQuit()
         {
-            Shutdown();
+            Shutdown("ApplicationQuit");
         }
 
         private void OnDestroy()
@@ -49,7 +51,7 @@ namespace Worldforge.Core.Bootstrap
                 return;
             }
 
-            Shutdown();
+            Shutdown("Destroy");
             ResetInstance();
         }
 
@@ -60,12 +62,7 @@ namespace Worldforge.Core.Bootstrap
                 return;
             }
 
-            if (flow == null)
-            {
-                throw new ArgumentNullException(nameof(flow));
-            }
-
-            startupFlow = flow;
+            startupFlow = flow ?? throw new ArgumentNullException(nameof(flow));
             bootstrapContext = new ApplicationBootstrapContext(this);
             startupFlow.Initialize(bootstrapContext);
             isInitialized = true;
@@ -107,24 +104,39 @@ namespace Worldforge.Core.Bootstrap
             Instance = null;
         }
 
-        private void Shutdown()
+        public void RequestShutdownAndQuit()
         {
-            if (!isInitialized || startupFlow == null)
+            Shutdown("QuitRequested");
+            Application.Quit();
+        }
+
+        private void Shutdown(string reason)
+        {
+            if (isShuttingDown || !isInitialized || startupFlow == null)
             {
                 return;
             }
 
-            startupFlow.Shutdown();
-            startupFlow = null;
-            bootstrapContext = null;
-            isInitialized = false;
+            isShuttingDown = true;
+
+            try
+            {
+                startupFlow.Shutdown(reason);
+            }
+            finally
+            {
+                startupFlow = null;
+                bootstrapContext = null;
+                isInitialized = false;
+                isShuttingDown = false;
+            }
         }
     }
 
     public sealed class ApplicationStartupFlow
     {
         private readonly List<IApplicationSystem> declaredSystems;
-        private readonly List<IApplicationSystem> executionPlan = new List<IApplicationSystem>();
+        private readonly List<IApplicationSystem> executionPlan = new();
 
         private ApplicationBootstrapContext context;
         private bool isInitialized;
@@ -153,7 +165,7 @@ namespace Worldforge.Core.Bootstrap
 
         public IServiceResolver Services
         {
-            get { return context != null ? context.Services : null; }
+            get { return context?.Services; }
         }
 
         public void Initialize(ApplicationBootstrapContext bootstrapContext)
@@ -163,12 +175,7 @@ namespace Worldforge.Core.Bootstrap
                 return;
             }
 
-            if (bootstrapContext == null)
-            {
-                throw new ArgumentNullException(nameof(bootstrapContext));
-            }
-
-            context = bootstrapContext;
+            context = bootstrapContext ?? throw new ArgumentNullException(nameof(bootstrapContext));
             try
             {
                 RegisterServices(context);
@@ -201,22 +208,63 @@ namespace Worldforge.Core.Bootstrap
                 context.LoadedSystems.Count);
         }
 
-        public void Shutdown()
+        public void Shutdown(string reason = "ApplicationExit")
         {
             if (!isInitialized || context == null)
             {
                 return;
             }
 
+            var shutdownErrors = new List<string>();
+            var shutdownContext = context;
+
+            shutdownContext.BeginShutdown(reason);
+            var executedSaveOperations = shutdownContext.ExecuteSaveOperations(shutdownErrors);
+
             for (var i = executionPlan.Count - 1; i >= 0; i--)
             {
-                executionPlan[i].Shutdown(context);
+                var system = executionPlan[i];
+
+                try
+                {
+                    system.Shutdown(shutdownContext);
+                }
+                catch (Exception exception)
+                {
+                    var message =
+                        $"[Worldforge] Shutdown system '{system.Name}' failed: {exception.Message}";
+                    shutdownErrors.Add(message);
+                    Debug.LogException(exception);
+                }
             }
 
-            context.DisposeServices();
+            var executedCleanupOperations = shutdownContext.ExecuteCleanupOperations(shutdownErrors);
+            var releasedRuntimeResources = shutdownContext.ReleaseRuntimeResources(shutdownErrors);
+            var destroyedTemporaryObjects = shutdownContext.DestroyTemporaryObjects(shutdownErrors);
+
+            var snapshot = shutdownContext.CreateShutdownSnapshot(
+                executedSaveOperations,
+                executedCleanupOperations,
+                releasedRuntimeResources,
+                destroyedTemporaryObjects,
+                shutdownErrors);
+            shutdownContext.PersistShutdownSnapshot(snapshot, shutdownErrors);
+            shutdownContext.DisposeServices(shutdownErrors);
+            shutdownContext.ClearShutdownRegistrations();
+
             executionPlan.Clear();
             context = null;
             isInitialized = false;
+
+            if (shutdownErrors.Count == 0)
+            {
+                Debug.Log("[Worldforge] Application shutdown completed gracefully.");
+                return;
+            }
+
+            Debug.LogWarningFormat(
+                "[Worldforge] Application shutdown completed with {0} issue(s). Review logs for details.",
+                shutdownErrors.Count);
         }
 
         private static IReadOnlyList<IApplicationSystem> BuildExecutionPlan(IReadOnlyList<IApplicationSystem> systems)
@@ -326,18 +374,20 @@ namespace Worldforge.Core.Bootstrap
 
     public sealed class ApplicationBootstrapContext
     {
-        private readonly List<string> loadedSystems = new List<string>();
-        private readonly List<string> loadedGameplayModules = new List<string>();
-        private readonly HashSet<string> loadedSystemNames = new HashSet<string>(StringComparer.Ordinal);
+        private readonly List<string> loadedSystems = new();
+        private readonly List<string> loadedGameplayModules = new();
+        private readonly HashSet<string> loadedSystemNames = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, string> runtimeState = new(StringComparer.Ordinal);
+        private readonly List<ShutdownActionRegistration> saveOperations = new();
+        private readonly List<ShutdownActionRegistration> cleanupOperations = new();
+        private readonly List<RuntimeResourceRegistration> runtimeResources = new();
+        private readonly List<TemporaryObjectRegistration> temporaryObjects = new();
+
+        private int registrationSequence;
 
         public ApplicationBootstrapContext(BootstrapManager manager)
         {
-            if (manager == null)
-            {
-                throw new ArgumentNullException(nameof(manager));
-            }
-
-            Manager = manager;
+            Manager = manager ?? throw new ArgumentNullException(nameof(manager));
         }
 
         public BootstrapManager Manager { get; }
@@ -356,6 +406,10 @@ namespace Worldforge.Core.Bootstrap
 
         public InputActionAsset ProjectWideInputActions { get; private set; }
 
+        public bool IsShuttingDown { get; private set; }
+
+        public string ShutdownReason { get; private set; }
+
         public string StartupScenePath
         {
             get { return SceneUtility.GetScenePathByBuildIndex(0); }
@@ -371,6 +425,87 @@ namespace Worldforge.Core.Bootstrap
             ProjectWideInputActions = inputActions;
         }
 
+        public void RegisterSaveOperation(string name, Action<ApplicationBootstrapContext> saveOperation, int order = 0)
+        {
+            if (saveOperation == null)
+            {
+                throw new ArgumentNullException(nameof(saveOperation));
+            }
+
+            saveOperations.Add(
+                new ShutdownActionRegistration(
+                    SanitizeRegistrationName(name, "SaveOperation"),
+                    saveOperation,
+                    order,
+                    registrationSequence++));
+        }
+
+        public void RegisterCleanupOperation(string name, Action<ApplicationBootstrapContext> cleanupOperation, int order = 0)
+        {
+            if (cleanupOperation == null)
+            {
+                throw new ArgumentNullException(nameof(cleanupOperation));
+            }
+
+            cleanupOperations.Add(
+                new ShutdownActionRegistration(
+                    SanitizeRegistrationName(name, "CleanupOperation"),
+                    cleanupOperation,
+                    order,
+                    registrationSequence++));
+        }
+
+        public void RegisterEventSubscription(string name, Action unsubscribeAction, int order = 0)
+        {
+            if (unsubscribeAction == null)
+            {
+                throw new ArgumentNullException(nameof(unsubscribeAction));
+            }
+
+            RegisterCleanupOperation(
+                SanitizeRegistrationName(name, "EventSubscription"),
+                _ => unsubscribeAction(),
+                order);
+        }
+
+        public void RegisterRuntimeResource(string name, IDisposable resource)
+        {
+            if (resource == null)
+            {
+                return;
+            }
+
+            runtimeResources.Add(
+                new RuntimeResourceRegistration(
+                    SanitizeRegistrationName(name, "RuntimeResource"),
+                    resource,
+                    registrationSequence++));
+        }
+
+        public void RegisterTemporaryObject(string name, UnityEngine.Object temporaryObject)
+        {
+            if (temporaryObject == null)
+            {
+                return;
+            }
+
+            temporaryObjects.Add(
+                new TemporaryObjectRegistration(
+                    SanitizeRegistrationName(name, "TemporaryObject"),
+                    temporaryObject,
+                    registrationSequence++));
+        }
+
+        public void RecordRuntimeState(string key, string value)
+        {
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                throw new ArgumentException("Runtime state key must be a non-empty value.", nameof(key));
+            }
+
+            runtimeState[key] = value ?? string.Empty;
+        }
+
         internal void SetServices(ServiceContainer serviceContainer)
         {
             Services = serviceContainer ?? throw new ArgumentNullException(nameof(serviceContainer));
@@ -378,9 +513,21 @@ namespace Worldforge.Core.Bootstrap
 
         internal void DisposeServices()
         {
+            DisposeServices(null);
+        }
+
+        internal void DisposeServices(ICollection<string> shutdownErrors)
+        {
             if (Services is IDisposable disposable)
             {
-                disposable.Dispose();
+                try
+                {
+                    disposable.Dispose();
+                }
+                catch (Exception exception)
+                {
+                    ReportShutdownError("Dispose runtime services", exception, shutdownErrors);
+                }
             }
 
             Services = null;
@@ -410,6 +557,253 @@ namespace Worldforge.Core.Bootstrap
                 loadedGameplayModules.Add(system.Name);
             }
         }
+
+        internal void BeginShutdown(string reason)
+        {
+            IsShuttingDown = true;
+            ShutdownReason = string.IsNullOrWhiteSpace(reason) ? "ApplicationExit" : reason;
+
+            RecordRuntimeState("application.name", Application.productName);
+            RecordRuntimeState("application.version", Application.version);
+            RecordRuntimeState("shutdown.reason", ShutdownReason);
+            RecordRuntimeState("shutdown.timestampUtc", DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
+            RecordRuntimeState("runtime.loadedSystemCount", loadedSystems.Count.ToString(CultureInfo.InvariantCulture));
+            RecordRuntimeState("runtime.loadedGameplayModuleCount", loadedGameplayModules.Count.ToString(CultureInfo.InvariantCulture));
+        }
+
+        internal List<string> ExecuteSaveOperations(ICollection<string> shutdownErrors)
+        {
+            var executedOperations = new List<string>();
+            var orderedOperations = new List<ShutdownActionRegistration>(saveOperations);
+            orderedOperations.Sort(CompareSaveOperations);
+
+            for (var i = 0; i < orderedOperations.Count; i++)
+            {
+                var operation = orderedOperations[i];
+                if (!TryExecuteShutdownStep(operation.Name, () => operation.Action(this), shutdownErrors))
+                {
+                    continue;
+                }
+
+                executedOperations.Add(operation.Name);
+            }
+
+            return executedOperations;
+        }
+
+        internal List<string> ExecuteCleanupOperations(ICollection<string> shutdownErrors)
+        {
+            var executedOperations = new List<string>();
+            var orderedOperations = new List<ShutdownActionRegistration>(cleanupOperations);
+            orderedOperations.Sort(CompareCleanupOperations);
+
+            for (var i = 0; i < orderedOperations.Count; i++)
+            {
+                var operation = orderedOperations[i];
+                if (!TryExecuteShutdownStep(operation.Name, () => operation.Action(this), shutdownErrors))
+                {
+                    continue;
+                }
+
+                executedOperations.Add(operation.Name);
+            }
+
+            return executedOperations;
+        }
+
+        internal List<string> ReleaseRuntimeResources(ICollection<string> shutdownErrors)
+        {
+            var releasedResources = new List<string>();
+
+            for (var i = runtimeResources.Count - 1; i >= 0; i--)
+            {
+                var resource = runtimeResources[i];
+                if (!TryExecuteShutdownStep(resource.Name, resource.Resource.Dispose, shutdownErrors))
+                {
+                    continue;
+                }
+
+                releasedResources.Add(resource.Name);
+            }
+
+            return releasedResources;
+        }
+
+        internal List<string> DestroyTemporaryObjects(ICollection<string> shutdownErrors)
+        {
+            var destroyedObjects = new List<string>();
+
+            for (var i = temporaryObjects.Count - 1; i >= 0; i--)
+            {
+                var temporaryObject = temporaryObjects[i];
+                if (temporaryObject.Object == null)
+                {
+                    continue;
+                }
+
+                if (!TryExecuteShutdownStep(
+                        temporaryObject.Name,
+                        () => DestroyTemporaryObject(temporaryObject.Object),
+                        shutdownErrors))
+                {
+                    continue;
+                }
+
+                destroyedObjects.Add(temporaryObject.Name);
+            }
+
+            return destroyedObjects;
+        }
+
+        internal ApplicationShutdownSnapshot CreateShutdownSnapshot(
+            IReadOnlyList<string> saveSteps,
+            IReadOnlyList<string> cleanupSteps,
+            IReadOnlyList<string> releasedResources,
+            IReadOnlyList<string> destroyedObjects,
+            IReadOnlyList<string> shutdownErrors)
+        {
+            var runtimeEntries = new List<ApplicationShutdownDataEntry>(runtimeState.Count);
+            foreach (var pair in runtimeState)
+            {
+                runtimeEntries.Add(new ApplicationShutdownDataEntry
+                {
+                    key = pair.Key,
+                    value = pair.Value
+                });
+            }
+
+            runtimeEntries.Sort((left, right) => StringComparer.Ordinal.Compare(left.key, right.key));
+
+            return new ApplicationShutdownSnapshot
+            {
+                applicationName = Application.productName,
+                applicationVersion = Application.version,
+                shutdownReason = ShutdownReason,
+                shutdownUtcTimestamp = DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture),
+                startupScenePath = StartupScenePath,
+                activeScenePath = ActiveScenePath,
+                loadedSystems = loadedSystems.ToArray(),
+                loadedGameplayModules = loadedGameplayModules.ToArray(),
+                runtimeData = runtimeEntries.ToArray(),
+                saveOperations = ToArray(saveSteps),
+                cleanupOperations = ToArray(cleanupSteps),
+                releasedRuntimeResources = ToArray(releasedResources),
+                destroyedTemporaryObjects = ToArray(destroyedObjects),
+                errors = ToArray(shutdownErrors)
+            };
+        }
+
+        internal void PersistShutdownSnapshot(ApplicationShutdownSnapshot snapshot, ICollection<string> shutdownErrors)
+        {
+            if (snapshot == null)
+            {
+                throw new ArgumentNullException(nameof(snapshot));
+            }
+
+            if (Services == null)
+            {
+                shutdownErrors?.Add("[Worldforge] Cannot persist shutdown snapshot because services are unavailable.");
+                return;
+            }
+
+            if (!Services.TryResolve<IApplicationShutdownSnapshotStore>(out var snapshotStore) || snapshotStore == null)
+            {
+                shutdownErrors?.Add("[Worldforge] Shutdown snapshot store is not registered.");
+                return;
+            }
+
+            TryExecuteShutdownStep(
+                "PersistShutdownSnapshot",
+                () => snapshotStore.Save(snapshot),
+                shutdownErrors);
+        }
+
+        internal void ClearShutdownRegistrations()
+        {
+            saveOperations.Clear();
+            cleanupOperations.Clear();
+            runtimeResources.Clear();
+            temporaryObjects.Clear();
+            runtimeState.Clear();
+            ProjectWideInputActions = null;
+            ShutdownReason = null;
+            IsShuttingDown = false;
+        }
+
+        private static int CompareSaveOperations(ShutdownActionRegistration left, ShutdownActionRegistration right)
+        {
+            var orderComparison = left.Order.CompareTo(right.Order);
+            if (orderComparison != 0)
+            {
+                return orderComparison;
+            }
+
+            return left.Sequence.CompareTo(right.Sequence);
+        }
+
+        private static int CompareCleanupOperations(ShutdownActionRegistration left, ShutdownActionRegistration right)
+        {
+            var orderComparison = right.Order.CompareTo(left.Order);
+            if (orderComparison != 0)
+            {
+                return orderComparison;
+            }
+
+            return right.Sequence.CompareTo(left.Sequence);
+        }
+
+        private static string SanitizeRegistrationName(string name, string fallbackName)
+        {
+            return string.IsNullOrWhiteSpace(name) ? fallbackName : name.Trim();
+        }
+
+        private static void DestroyTemporaryObject(UnityEngine.Object temporaryObject)
+        {
+            if (Application.isPlaying)
+            {
+                UnityEngine.Object.Destroy(temporaryObject);
+                return;
+            }
+
+            UnityEngine.Object.DestroyImmediate(temporaryObject);
+        }
+
+        private static string[] ToArray(IReadOnlyList<string> values)
+        {
+            if (values == null || values.Count == 0)
+            {
+                return Array.Empty<string>();
+            }
+
+            var result = new string[values.Count];
+            for (var i = 0; i < values.Count; i++)
+            {
+                result[i] = values[i];
+            }
+
+            return result;
+        }
+
+        private bool TryExecuteShutdownStep(string name, Action step, ICollection<string> shutdownErrors)
+        {
+            try
+            {
+                step();
+                return true;
+            }
+            catch (Exception exception)
+            {
+                ReportShutdownError(name, exception, shutdownErrors);
+                return false;
+            }
+        }
+
+        private static void ReportShutdownError(string name, Exception exception, ICollection<string> shutdownErrors)
+        {
+            var message = $"[Worldforge] Shutdown step '{name}' failed: {exception.Message}";
+            shutdownErrors?.Add(message);
+            Debug.LogException(exception);
+        }
     }
 
     public enum ApplicationSystemCategory
@@ -438,6 +832,15 @@ namespace Worldforge.Core.Bootstrap
         int Order { get; }
 
         IEnumerable<IApplicationSystem> CreateSystems();
+    }
+
+    public interface IApplicationShutdownSnapshotStore
+    {
+        ApplicationShutdownSnapshot LastSavedSnapshot { get; }
+
+        string SnapshotPath { get; }
+
+        void Save(ApplicationShutdownSnapshot snapshot);
     }
 
     internal sealed class InputBootstrapSystem : IApplicationSystem
@@ -475,18 +878,13 @@ namespace Worldforge.Core.Bootstrap
 
             actions.Enable();
             context.SetProjectWideInputActions(actions);
+            context.RegisterCleanupOperation("Core.Input.DisableActions", _ => actions.Disable());
 
             Debug.LogFormat("[Worldforge] Loaded input actions '{0}'.", actions.name);
         }
 
         public void Shutdown(ApplicationBootstrapContext context)
         {
-            if (context.ProjectWideInputActions == null)
-            {
-                return;
-            }
-
-            context.ProjectWideInputActions.Disable();
         }
     }
 
@@ -518,6 +916,7 @@ namespace Worldforge.Core.Bootstrap
         {
             SceneManager.sceneLoaded -= OnSceneLoaded;
             SceneManager.sceneLoaded += OnSceneLoaded;
+            context.RegisterEventSubscription("Core.SceneFlow.SceneLoaded", () => SceneManager.sceneLoaded -= OnSceneLoaded);
 
             var startupScenePath = context.StartupScenePath;
             if (string.IsNullOrEmpty(startupScenePath))
@@ -531,7 +930,6 @@ namespace Worldforge.Core.Bootstrap
 
         public void Shutdown(ApplicationBootstrapContext context)
         {
-            SceneManager.sceneLoaded -= OnSceneLoaded;
         }
 
         private static void OnSceneLoaded(Scene scene, LoadSceneMode mode)
@@ -655,5 +1053,56 @@ namespace Worldforge.Core.Bootstrap
     {
         Visiting,
         Visited
+    }
+
+    internal sealed class ShutdownActionRegistration
+    {
+        public ShutdownActionRegistration(string name, Action<ApplicationBootstrapContext> action, int order, int sequence)
+        {
+            Name = name;
+            Action = action ?? throw new ArgumentNullException(nameof(action));
+            Order = order;
+            Sequence = sequence;
+        }
+
+        public string Name { get; }
+
+        public Action<ApplicationBootstrapContext> Action { get; }
+
+        public int Order { get; }
+
+        public int Sequence { get; }
+    }
+
+    internal sealed class RuntimeResourceRegistration
+    {
+        public RuntimeResourceRegistration(string name, IDisposable resource, int sequence)
+        {
+            Name = name;
+            Resource = resource ?? throw new ArgumentNullException(nameof(resource));
+            Sequence = sequence;
+        }
+
+        public string Name { get; }
+
+        public IDisposable Resource { get; }
+
+        public int Sequence { get; }
+    }
+
+    internal sealed class TemporaryObjectRegistration
+    {
+        public TemporaryObjectRegistration(string name, UnityEngine.Object temporaryObject, int sequence)
+        {
+            Name = name;
+            Object = temporaryObject ?? throw new ArgumentNullException(nameof(temporaryObject));
+            Sequence = sequence;
+        }
+
+        public string Name { get; }
+
+        public UnityEngine.Object Object { get; }
+
+        public int Sequence { get; }
     }
 }
