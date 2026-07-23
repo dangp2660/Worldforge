@@ -9,6 +9,7 @@ namespace Worldforge.Core.Bootstrap
     public sealed class BootstrapManager : MonoBehaviour
     {
         private ApplicationStartupFlow startupFlow;
+        private ApplicationBootstrapContext bootstrapContext;
         private bool isInitialized;
 
         public static BootstrapManager Instance { get; private set; }
@@ -16,6 +17,11 @@ namespace Worldforge.Core.Bootstrap
         public static bool HasInstance
         {
             get { return Instance != null; }
+        }
+
+        public IServiceResolver Services
+        {
+            get { return bootstrapContext != null ? bootstrapContext.Services : null; }
         }
 
         private void Awake()
@@ -59,8 +65,40 @@ namespace Worldforge.Core.Bootstrap
             }
 
             startupFlow = flow;
-            startupFlow.Initialize(new ApplicationBootstrapContext(this));
+            bootstrapContext = new ApplicationBootstrapContext(this);
+            startupFlow.Initialize(bootstrapContext);
             isInitialized = true;
+        }
+
+        public T Resolve<T>()
+        {
+            if (Services == null)
+            {
+                throw new InvalidOperationException("Worldforge services are not available before bootstrap completes.");
+            }
+
+            return Services.Resolve<T>();
+        }
+
+        public static T ResolveRequired<T>()
+        {
+            if (!HasInstance)
+            {
+                throw new InvalidOperationException("BootstrapManager has not been created.");
+            }
+
+            return Instance.Resolve<T>();
+        }
+
+        public static bool TryResolve<T>(out T service)
+        {
+            if (!HasInstance || Instance.Services == null)
+            {
+                service = default;
+                return false;
+            }
+
+            return Instance.Services.TryResolve(out service);
         }
 
         internal static void ResetInstance()
@@ -77,6 +115,7 @@ namespace Worldforge.Core.Bootstrap
 
             startupFlow.Shutdown();
             startupFlow = null;
+            bootstrapContext = null;
             isInitialized = false;
         }
     }
@@ -98,6 +137,11 @@ namespace Worldforge.Core.Bootstrap
             get { return systems; }
         }
 
+        public IServiceResolver Services
+        {
+            get { return context != null ? context.Services : null; }
+        }
+
         public void Initialize(ApplicationBootstrapContext bootstrapContext)
         {
             if (isInitialized)
@@ -111,6 +155,7 @@ namespace Worldforge.Core.Bootstrap
             }
 
             context = bootstrapContext;
+            RegisterServices(context);
 
             foreach (var system in systems)
             {
@@ -137,8 +182,27 @@ namespace Worldforge.Core.Bootstrap
                 systems[i].Shutdown(context);
             }
 
+            context.DisposeServices();
             context = null;
             isInitialized = false;
+        }
+
+        private static void RegisterServices(ApplicationBootstrapContext bootstrapContext)
+        {
+            var providers = ServiceRegistrationDiscovery.DiscoverProviders();
+            var services = new ServiceCollection();
+
+            foreach (var provider in providers)
+            {
+                provider.RegisterServices(bootstrapContext, services);
+            }
+
+            bootstrapContext.SetServices(new ServiceContainer(services.Descriptors));
+
+            Debug.LogFormat(
+                "[Worldforge] Registered {0} runtime services from {1} providers.",
+                services.Count,
+                providers.Count);
         }
     }
 
@@ -163,6 +227,8 @@ namespace Worldforge.Core.Bootstrap
             get { return loadedSystems; }
         }
 
+        public IServiceResolver Services { get; private set; }
+
         public InputActionAsset ProjectWideInputActions { get; private set; }
 
         public string StartupScenePath
@@ -178,6 +244,21 @@ namespace Worldforge.Core.Bootstrap
         public void SetProjectWideInputActions(InputActionAsset inputActions)
         {
             ProjectWideInputActions = inputActions;
+        }
+
+        internal void SetServices(ServiceContainer serviceContainer)
+        {
+            Services = serviceContainer ?? throw new ArgumentNullException(nameof(serviceContainer));
+        }
+
+        internal void DisposeServices()
+        {
+            if (Services is IDisposable disposable)
+            {
+                disposable.Dispose();
+            }
+
+            Services = null;
         }
 
         internal void MarkSystemLoaded(string systemName)

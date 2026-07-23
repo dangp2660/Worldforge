@@ -3,6 +3,8 @@
   "rootNamespace": "Worldforge.Core.Tests",
   "references": [
     "Core",
+    "Inventory",
+    "Gathering",
     "UnityEngine.TestRunner",
     "UnityEditor.TestRunner"
   ],
