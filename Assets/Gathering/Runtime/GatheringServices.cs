@@ -1,5 +1,7 @@
 using System;
 using Worldforge.Core.Bootstrap;
+using Worldforge.Inventory.Services;
+using UnityEngine;
 
 namespace Worldforge.Gathering.Services
 {
@@ -35,6 +37,60 @@ namespace Worldforge.Gathering.Services
         public void RegisterServices(ApplicationBootstrapContext context, IServiceRegistry services)
         {
             services.AddTransient<IGatheringService>(_ => new RuntimeGatheringService());
+        }
+    }
+
+    internal sealed class GatheringInitializationSystemProvider : IApplicationSystemProvider
+    {
+        public int Order
+        {
+            get { return 110; }
+        }
+
+        public System.Collections.Generic.IEnumerable<IApplicationSystem> CreateSystems()
+        {
+            return new IApplicationSystem[]
+            {
+                new GatheringInitializationSystem()
+            };
+        }
+    }
+
+    internal sealed class GatheringInitializationSystem : IApplicationSystem
+    {
+        private static readonly System.Collections.Generic.IReadOnlyList<string> DependenciesList =
+            new[] { "SceneFlow", "Gameplay.Inventory" };
+
+        public string Name
+        {
+            get { return "Gameplay.Gathering"; }
+        }
+
+        public int Order
+        {
+            get { return 110; }
+        }
+
+        public ApplicationSystemCategory Category
+        {
+            get { return ApplicationSystemCategory.Gameplay; }
+        }
+
+        public System.Collections.Generic.IReadOnlyList<string> Dependencies
+        {
+            get { return DependenciesList; }
+        }
+
+        public void Initialize(ApplicationBootstrapContext context)
+        {
+            context.Services.Resolve<IInventoryService>();
+            context.Services.Resolve<IGatheringService>();
+
+            Debug.Log("[Worldforge] Gathering gameplay module initialized.");
+        }
+
+        public void Shutdown(ApplicationBootstrapContext context)
+        {
         }
     }
 }

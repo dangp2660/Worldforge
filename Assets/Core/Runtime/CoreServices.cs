@@ -8,6 +8,8 @@ namespace Worldforge.Core.Services
     {
         IReadOnlyList<string> LoadedSystems { get; }
 
+        IReadOnlyList<string> LoadedGameplayModules { get; }
+
         string StartupScenePath { get; }
 
         string ActiveScenePath { get; }
@@ -59,6 +61,11 @@ namespace Worldforge.Core.Bootstrap
         public IReadOnlyList<string> LoadedSystems
         {
             get { return context.LoadedSystems; }
+        }
+
+        public IReadOnlyList<string> LoadedGameplayModules
+        {
+            get { return context.LoadedGameplayModules; }
         }
 
         public string StartupScenePath

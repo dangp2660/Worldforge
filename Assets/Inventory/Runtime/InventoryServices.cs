@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Worldforge.Core.Bootstrap;
+using UnityEngine;
 
 namespace Worldforge.Inventory.Services
 {
@@ -57,6 +58,58 @@ namespace Worldforge.Inventory.Services
         {
             services.AddSingleton<IInventoryService>(_ => new RuntimeInventoryService());
             services.AddScoped<IInventorySessionService>(_ => new InventorySessionService());
+        }
+    }
+
+    internal sealed class InventoryInitializationSystemProvider : IApplicationSystemProvider
+    {
+        public int Order
+        {
+            get { return 100; }
+        }
+
+        public IEnumerable<IApplicationSystem> CreateSystems()
+        {
+            return new IApplicationSystem[]
+            {
+                new InventoryInitializationSystem()
+            };
+        }
+    }
+
+    internal sealed class InventoryInitializationSystem : IApplicationSystem
+    {
+        private static readonly IReadOnlyList<string> DependenciesList = new[] { "Input", "SceneFlow" };
+
+        public string Name
+        {
+            get { return "Gameplay.Inventory"; }
+        }
+
+        public int Order
+        {
+            get { return 100; }
+        }
+
+        public ApplicationSystemCategory Category
+        {
+            get { return ApplicationSystemCategory.Gameplay; }
+        }
+
+        public IReadOnlyList<string> Dependencies
+        {
+            get { return DependenciesList; }
+        }
+
+        public void Initialize(ApplicationBootstrapContext context)
+        {
+            context.Services.Resolve<IInventoryService>();
+
+            Debug.Log("[Worldforge] Inventory gameplay module initialized.");
+        }
+
+        public void Shutdown(ApplicationBootstrapContext context)
+        {
         }
     }
 }

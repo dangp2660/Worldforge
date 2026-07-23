@@ -2,7 +2,8 @@
   "name": "Gathering",
   "rootNamespace": "Worldforge.Gathering",
   "references": [
-    "Core"
+    "Core",
+    "Inventory"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],

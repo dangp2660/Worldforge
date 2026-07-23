@@ -27,16 +27,9 @@ namespace Worldforge.Core.Bootstrap
             Object.DontDestroyOnLoad(bootstrapRoot);
 
             var bootstrapManager = bootstrapRoot.AddComponent<BootstrapManager>();
-            bootstrapManager.Initialize(CreateStartupFlow());
+            bootstrapManager.Initialize(ApplicationStartupFlow.CreateDefault());
 
             s_IsBootstrapped = true;
-        }
-
-        private static ApplicationStartupFlow CreateStartupFlow()
-        {
-            return new ApplicationStartupFlow(
-                new InputBootstrapSystem(),
-                new SceneBootstrapSystem());
         }
     }
 }
