@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using UnityEngine;
 using Worldforge.Core.Bootstrap;
+using Worldforge.Core.Services;
 
 namespace Worldforge.Save.Runtime
 {
@@ -14,13 +15,20 @@ namespace Worldforge.Save.Runtime
 
         public void RegisterServices(ApplicationBootstrapContext context, IServiceRegistry services)
         {
-            services.AddSingleton<IApplicationShutdownSnapshotStore>(_ => new RuntimeShutdownSnapshotStore());
+            services.AddSingleton<IApplicationShutdownSnapshotStore>(
+                resolver => new RuntimeShutdownSnapshotStore(resolver.Resolve<ILogService>()));
         }
     }
 
     internal sealed class RuntimeShutdownSnapshotStore : IApplicationShutdownSnapshotStore
     {
         private const string SnapshotFileName = "worldforge-runtime-shutdown.json";
+        private readonly ILogService logger;
+
+        public RuntimeShutdownSnapshotStore(ILogService logger)
+        {
+            this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        }
 
         public ApplicationShutdownSnapshot LastSavedSnapshot { get; private set; }
 
@@ -42,14 +50,14 @@ namespace Worldforge.Save.Runtime
             LastSavedSnapshot = snapshot;
 
             var snapshotDirectory = Path.GetDirectoryName(SnapshotPath);
-            if (!string.IsNullOrEmpty(snapshotDirectory))
+            if (snapshotDirectory is { Length: > 0 })
             {
                 Directory.CreateDirectory(snapshotDirectory);
             }
 
             File.WriteAllText(SnapshotPath, JsonUtility.ToJson(snapshot, true));
 
-            Debug.LogFormat("[Worldforge] Saved shutdown snapshot to '{0}'.", SnapshotPath);
+            logger.Info("Save.ShutdownSnapshot", $"Saved shutdown snapshot to '{SnapshotPath}'.");
         }
     }
 }

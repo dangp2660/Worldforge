@@ -59,4 +59,4 @@ TagManager:
   - Decal Layer 6
   - Decal Layer 7
   m_MigratedRenderPipelines:
-  - UnityEngine.Rendering.HighDefinition.HDRenderPipeline
+  - UnityEngine.Rendering.Universal.UniversalRenderPipeline

@@ -1,7 +1,7 @@
 using System;
 using Worldforge.Core.Bootstrap;
+using Worldforge.Core.Services;
 using Worldforge.Inventory.Services;
-using UnityEngine;
 
 namespace Worldforge.Gathering.Services
 {
@@ -85,13 +85,14 @@ namespace Worldforge.Gathering.Services
         {
             context.Services.Resolve<IInventoryService>();
             context.Services.Resolve<IGatheringService>();
+            var logger = context.Services.TryResolve<ILogService>(out var resolvedLogger) ? resolvedLogger : null;
             context.RegisterSaveOperation(
                 "Gameplay.Gathering.SaveRuntimeData",
                 currentContext => currentContext.RecordRuntimeState("gathering.serviceLifetime", ServiceLifetime.Transient.ToString()),
                 110);
             context.RegisterRuntimeResource("Gameplay.Gathering.RuntimeCache", new GatheringRuntimeCache());
 
-            Debug.Log("[Worldforge] Gathering gameplay module initialized.");
+            logger?.Info("Gameplay.Gathering", "Gathering gameplay module initialized.");
         }
 
         public void Shutdown(ApplicationBootstrapContext context)

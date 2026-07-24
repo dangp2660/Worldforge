@@ -4,6 +4,7 @@ using System.Globalization;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using Worldforge.Core.Bootstrap;
+using Worldforge.Core.Services;
 
 namespace Worldforge.Inventory.Services
 {
@@ -84,6 +85,7 @@ namespace Worldforge.Inventory.Services
         private static readonly IReadOnlyList<string> DependenciesList = new[] { "Input", "SceneFlow" };
 
         private GameObject runtimeRoot;
+        private ILogService logger;
 
         public string Name
         {
@@ -108,6 +110,7 @@ namespace Worldforge.Inventory.Services
         public void Initialize(ApplicationBootstrapContext context)
         {
             context.Services.Resolve<IInventoryService>();
+            logger = context.Services.TryResolve<ILogService>(out var resolvedLogger) ? resolvedLogger : null;
 
             runtimeRoot = new GameObject("Worldforge.Inventory.RuntimeRoot")
             {
@@ -124,12 +127,13 @@ namespace Worldforge.Inventory.Services
                 () => SceneManager.activeSceneChanged -= OnActiveSceneChanged,
                 100);
 
-            Debug.Log("[Worldforge] Inventory gameplay module initialized.");
+            logger?.Info("Gameplay.Inventory", "Inventory gameplay module initialized.");
         }
 
         public void Shutdown(ApplicationBootstrapContext context)
         {
             runtimeRoot = null;
+            logger = null;
         }
 
         private static void SaveRuntimeData(ApplicationBootstrapContext context)
@@ -140,12 +144,15 @@ namespace Worldforge.Inventory.Services
                 inventoryService.RegisteredContainerCount.ToString(CultureInfo.InvariantCulture));
         }
 
-        private static void OnActiveSceneChanged(Scene previousScene, Scene nextScene)
+        private void OnActiveSceneChanged(Scene previousScene, Scene nextScene)
         {
-            Debug.LogFormat(
-                "[Worldforge] Inventory runtime observed active scene change: '{0}' -> '{1}'.",
-                previousScene.path,
-                nextScene.path);
+            logger?.Info(
+                "Gameplay.Inventory",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "Inventory runtime observed active scene change: '{0}' -> '{1}'.",
+                    previousScene.path,
+                    nextScene.path));
         }
     }
 }

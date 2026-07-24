@@ -5,6 +5,7 @@ using System.Reflection;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
+using Worldforge.Core.Services;
 
 namespace Worldforge.Core.Bootstrap
 {
@@ -179,8 +180,9 @@ namespace Worldforge.Core.Bootstrap
             try
             {
                 RegisterServices(context);
+                var logger = context.GetLoggerOrNull();
                 executionPlan.Clear();
-                executionPlan.AddRange(BuildExecutionPlan(declaredSystems));
+                executionPlan.AddRange(BuildExecutionPlan(declaredSystems, logger));
 
                 foreach (var system in executionPlan)
                 {
@@ -193,8 +195,9 @@ namespace Worldforge.Core.Bootstrap
                     context.MarkSystemLoaded(system);
                 }
             }
-            catch
+            catch (Exception exception)
             {
+                context.GetLoggerOrNull()?.Error("Bootstrap.Initialize", "Application bootstrap failed.", exception);
                 context.DisposeServices();
                 executionPlan.Clear();
                 context = null;
@@ -203,9 +206,12 @@ namespace Worldforge.Core.Bootstrap
 
             isInitialized = true;
 
-            Debug.LogFormat(
-                "[Worldforge] Bootstrap complete. Loaded {0} application systems.",
-                context.LoadedSystems.Count);
+            context.GetLoggerOrNull()?.Info(
+                "Bootstrap.Initialize",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "Bootstrap complete. Loaded {0} application systems.",
+                    context.LoadedSystems.Count));
         }
 
         public void Shutdown(string reason = "ApplicationExit")
@@ -232,9 +238,9 @@ namespace Worldforge.Core.Bootstrap
                 catch (Exception exception)
                 {
                     var message =
-                        $"[Worldforge] Shutdown system '{system.Name}' failed: {exception.Message}";
+                        $"Shutdown system '{system.Name}' failed: {exception.Message}";
                     shutdownErrors.Add(message);
-                    Debug.LogException(exception);
+                    shutdownContext.GetLoggerOrNull()?.Error("Bootstrap.Shutdown", message, exception);
                 }
             }
 
@@ -258,16 +264,21 @@ namespace Worldforge.Core.Bootstrap
 
             if (shutdownErrors.Count == 0)
             {
-                Debug.Log("[Worldforge] Application shutdown completed gracefully.");
+                shutdownContext.GetLoggerOrNull()?.Info("Bootstrap.Shutdown", "Application shutdown completed gracefully.");
                 return;
             }
 
-            Debug.LogWarningFormat(
-                "[Worldforge] Application shutdown completed with {0} issue(s). Review logs for details.",
-                shutdownErrors.Count);
+            shutdownContext.GetLoggerOrNull()?.Warning(
+                "Bootstrap.Shutdown",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "Application shutdown completed with {0} issue(s). Review logs for details.",
+                    shutdownErrors.Count));
         }
 
-        private static IReadOnlyList<IApplicationSystem> BuildExecutionPlan(IReadOnlyList<IApplicationSystem> systems)
+        private static IReadOnlyList<IApplicationSystem> BuildExecutionPlan(
+            IReadOnlyList<IApplicationSystem> systems,
+            ILogService logger)
         {
             var uniqueSystems = new Dictionary<string, IApplicationSystem>(StringComparer.Ordinal);
 
@@ -286,9 +297,12 @@ namespace Worldforge.Core.Bootstrap
 
                 if (uniqueSystems.ContainsKey(system.Name))
                 {
-                    Debug.LogWarningFormat(
-                        "[Worldforge] Ignoring duplicate application system '{0}'.",
-                        system.Name);
+                    logger?.Warning(
+                        "Bootstrap.ExecutionPlan",
+                        string.Format(
+                            CultureInfo.InvariantCulture,
+                            "Ignoring duplicate application system '{0}'.",
+                            system.Name));
                     continue;
                 }
 
@@ -365,10 +379,13 @@ namespace Worldforge.Core.Bootstrap
 
             bootstrapContext.SetServices(new ServiceContainer(services.Descriptors));
 
-            Debug.LogFormat(
-                "[Worldforge] Registered {0} runtime services from {1} providers.",
-                services.Count,
-                providers.Count);
+            bootstrapContext.GetLoggerOrNull()?.Info(
+                "Bootstrap.Services",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "Registered {0} runtime services from {1} providers.",
+                    services.Count,
+                    providers.Count));
         }
     }
 
@@ -504,6 +521,16 @@ namespace Worldforge.Core.Bootstrap
             }
 
             runtimeState[key] = value ?? string.Empty;
+        }
+
+        internal ILogService GetLoggerOrNull()
+        {
+            if (Services == null)
+            {
+                return null;
+            }
+
+            return Services.TryResolve<ILogService>(out var logger) ? logger : null;
         }
 
         internal void SetServices(ServiceContainer serviceContainer)
@@ -798,11 +825,11 @@ namespace Worldforge.Core.Bootstrap
             }
         }
 
-        private static void ReportShutdownError(string name, Exception exception, ICollection<string> shutdownErrors)
+        private void ReportShutdownError(string name, Exception exception, ICollection<string> shutdownErrors)
         {
-            var message = $"[Worldforge] Shutdown step '{name}' failed: {exception.Message}";
+            var message = $"Shutdown step '{name}' failed: {exception.Message}";
             shutdownErrors?.Add(message);
-            Debug.LogException(exception);
+            GetLoggerOrNull()?.Error("Bootstrap.Shutdown", message, exception);
         }
     }
 
@@ -869,10 +896,11 @@ namespace Worldforge.Core.Bootstrap
 
         public void Initialize(ApplicationBootstrapContext context)
         {
+            var logger = context.GetLoggerOrNull();
             var actions = InputSystem.actions;
             if (actions == null)
             {
-                Debug.LogWarning("[Worldforge] Input bootstrap did not find a project-wide Input Action Asset.");
+                logger?.Warning("Bootstrap.Input", "Input bootstrap did not find a project-wide Input Action Asset.");
                 return;
             }
 
@@ -880,7 +908,12 @@ namespace Worldforge.Core.Bootstrap
             context.SetProjectWideInputActions(actions);
             context.RegisterCleanupOperation("Core.Input.DisableActions", _ => actions.Disable());
 
-            Debug.LogFormat("[Worldforge] Loaded input actions '{0}'.", actions.name);
+            logger?.Info(
+                "Bootstrap.Input",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "Loaded input actions '{0}'.",
+                    actions.name));
         }
 
         public void Shutdown(ApplicationBootstrapContext context)
@@ -891,6 +924,7 @@ namespace Worldforge.Core.Bootstrap
     internal sealed class SceneBootstrapSystem : IApplicationSystem
     {
         private static readonly IReadOnlyList<string> DependenciesList = new[] { "Input" };
+        private ILogService logger;
 
         public string Name
         {
@@ -914,6 +948,7 @@ namespace Worldforge.Core.Bootstrap
 
         public void Initialize(ApplicationBootstrapContext context)
         {
+            logger = context.GetLoggerOrNull();
             SceneManager.sceneLoaded -= OnSceneLoaded;
             SceneManager.sceneLoaded += OnSceneLoaded;
             context.RegisterEventSubscription("Core.SceneFlow.SceneLoaded", () => SceneManager.sceneLoaded -= OnSceneLoaded);
@@ -921,20 +956,32 @@ namespace Worldforge.Core.Bootstrap
             var startupScenePath = context.StartupScenePath;
             if (string.IsNullOrEmpty(startupScenePath))
             {
-                Debug.LogWarning("[Worldforge] No startup scene is configured in Build Settings.");
+                logger?.Warning("Bootstrap.SceneFlow", "No startup scene is configured in Build Settings.");
                 return;
             }
 
-            Debug.LogFormat("[Worldforge] Startup scene configured as '{0}'.", startupScenePath);
+            logger?.Info(
+                "Bootstrap.SceneFlow",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "Startup scene configured as '{0}'.",
+                    startupScenePath));
         }
 
         public void Shutdown(ApplicationBootstrapContext context)
         {
+            logger = null;
         }
 
-        private static void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+        private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
         {
-            Debug.LogFormat("[Worldforge] Scene loaded: '{0}' ({1}).", scene.path, mode);
+            logger?.Info(
+                "Bootstrap.SceneFlow",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "Scene loaded: '{0}' ({1}).",
+                    scene.path,
+                    mode));
         }
     }
 
