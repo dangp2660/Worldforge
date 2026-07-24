@@ -2,7 +2,10 @@
   "name": "Infrastructure",
   "rootNamespace": "Worldforge.Infrastructure",
   "references": [
-    "Core"
+    "Core",
+    "Inventory",
+    "Gathering",
+    "UnityEngine.UI"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],

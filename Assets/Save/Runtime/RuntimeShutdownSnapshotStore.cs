@@ -42,12 +42,7 @@ namespace Worldforge.Save.Runtime
 
         public void Save(ApplicationShutdownSnapshot snapshot)
         {
-            if (snapshot == null)
-            {
-                throw new ArgumentNullException(nameof(snapshot));
-            }
-
-            LastSavedSnapshot = snapshot;
+            LastSavedSnapshot = snapshot ?? throw new ArgumentNullException(nameof(snapshot));
 
             var snapshotDirectory = Path.GetDirectoryName(SnapshotPath);
             if (snapshotDirectory is { Length: > 0 })

@@ -84,7 +84,7 @@ namespace Worldforge.Core.Services
 
     internal sealed class RuntimeLogConfiguration : ILogConfiguration
     {
-        private readonly List<ILogOutput> outputs = new List<ILogOutput>();
+        private readonly List<ILogOutput> outputs = new();
 
         public LogLevel MinimumLevel { get; set; } = LogLevel.Info;
 
