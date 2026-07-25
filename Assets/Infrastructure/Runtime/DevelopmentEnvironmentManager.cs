@@ -7,22 +7,22 @@ namespace Worldforge.Infrastructure.Development
         private const string GeneratedObjectPrefix = "DevGenerated_";
 
         [SerializeField] private Transform environmentRoot;
-        [SerializeField] private Vector3 floorScale = new Vector3(4f, 1f, 4f);
+        [SerializeField] private Vector3 floorScale = new(4f, 1f, 4f);
         [SerializeField] private float floorHeight;
-        [SerializeField] private Vector3 markerScale = new Vector3(1f, 2f, 1f);
+        [SerializeField] private Vector3 markerScale = new(1f, 2f, 1f);
         [SerializeField] private float markerOffset = 18f;
         [SerializeField] private bool generateOnAwake = true;
+
+        public Transform EnvironmentRoot
+        {
+            get { return environmentRoot != null ? environmentRoot : transform; }
+        }
 
         private void Awake()
         {
             if (!generateOnAwake)
             {
                 return;
-            }
-
-            if (environmentRoot == null)
-            {
-                environmentRoot = transform;
             }
 
             ClearGeneratedChildren();
@@ -33,9 +33,10 @@ namespace Worldforge.Infrastructure.Development
 
         private void ClearGeneratedChildren()
         {
-            for (var i = environmentRoot.childCount - 1; i >= 0; i--)
+            var root = EnvironmentRoot;
+            for (var i = root.childCount - 1; i >= 0; i--)
             {
-                var child = environmentRoot.GetChild(i);
+                var child = root.GetChild(i);
                 if (!child.name.StartsWith(GeneratedObjectPrefix, System.StringComparison.Ordinal))
                 {
                     continue;
@@ -49,9 +50,8 @@ namespace Worldforge.Infrastructure.Development
         {
             var floor = GameObject.CreatePrimitive(PrimitiveType.Plane);
             floor.name = $"{GeneratedObjectPrefix}Floor";
-            floor.transform.SetParent(environmentRoot, false);
-            floor.transform.localPosition = new Vector3(0f, floorHeight, 0f);
-            floor.transform.localRotation = Quaternion.identity;
+            floor.transform.SetParent(EnvironmentRoot, false);
+            floor.transform.SetLocalPositionAndRotation(new Vector3(0f, floorHeight, 0f), Quaternion.identity);
             floor.transform.localScale = floorScale;
         }
 
@@ -67,18 +67,16 @@ namespace Worldforge.Infrastructure.Development
         {
             var marker = GameObject.CreatePrimitive(PrimitiveType.Cube);
             marker.name = $"{GeneratedObjectPrefix}{markerName}Marker";
-            marker.transform.SetParent(environmentRoot, false);
-            marker.transform.localPosition = localPosition;
-            marker.transform.localRotation = Quaternion.identity;
+            marker.transform.SetParent(EnvironmentRoot, false);
+            marker.transform.SetLocalPositionAndRotation(localPosition, Quaternion.identity);
             marker.transform.localScale = markerScale;
         }
 
         private void CreatePlayerSpawnAnchor()
         {
             var spawnAnchor = new GameObject($"{GeneratedObjectPrefix}PlayerSpawn");
-            spawnAnchor.transform.SetParent(environmentRoot, false);
-            spawnAnchor.transform.localPosition = new Vector3(0f, floorHeight, 0f);
-            spawnAnchor.transform.localRotation = Quaternion.identity;
+            spawnAnchor.transform.SetParent(EnvironmentRoot, false);
+            spawnAnchor.transform.SetLocalPositionAndRotation(new Vector3(0f, floorHeight, 0f), Quaternion.identity);
             spawnAnchor.transform.localScale = Vector3.one;
         }
     }

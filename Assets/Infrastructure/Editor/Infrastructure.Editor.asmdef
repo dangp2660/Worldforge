@@ -3,7 +3,8 @@
   "rootNamespace": "Worldforge.Infrastructure.Editor",
   "references": [
     "Infrastructure",
-    "Core.Editor"
+    "Core.Editor",
+    "Unity.InputSystem"
   ],
   "includePlatforms": [
     "Editor"
