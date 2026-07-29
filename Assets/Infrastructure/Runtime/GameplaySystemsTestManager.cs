@@ -20,15 +20,37 @@ namespace Worldforge.Infrastructure.Development
                 return;
             }
 
-            if (!BootstrapManager.TryResolve<IInventoryService>(out var inventoryService) || inventoryService == null)
+            if (!BootstrapManager.TryResolve<Worldforge.Core.Bootstrap.IGameSessionManager>(out var gameSessionManager) ||
+                gameSessionManager == null)
+            {
+                Debug.LogWarning("[Worldforge] [Warning] [Development.GameplayTest] Game session manager is not available.");
+                return;
+            }
+
+            var gameSession = gameSessionManager.HasActiveSession
+                ? gameSessionManager.CurrentSession
+                : gameSessionManager.StartNewGame();
+            if (gameSession == null)
+            {
+                Debug.LogWarning("[Worldforge] [Warning] [Development.GameplayTest] Game session could not be started.");
+                return;
+            }
+
+            if (!gameSession.Services.TryResolve<IInventoryService>(out var inventoryService) || inventoryService == null)
             {
                 Debug.LogWarning("[Worldforge] [Warning] [Development.GameplayTest] Inventory service is not available.");
                 return;
             }
 
-            if (!BootstrapManager.TryResolve<IGatheringService>(out var gatheringService) || gatheringService == null)
+            if (!gameSession.Services.TryResolve<IGatheringService>(out var gatheringService) || gatheringService == null)
             {
                 Debug.LogWarning("[Worldforge] [Warning] [Development.GameplayTest] Gathering service is not available.");
+                return;
+            }
+
+            if (!gameSession.Services.TryResolve<IInventorySessionService>(out _))
+            {
+                Debug.LogWarning("[Worldforge] [Warning] [Development.GameplayTest] Inventory session service is not available.");
                 return;
             }
 
@@ -41,13 +63,15 @@ namespace Worldforge.Infrastructure.Development
             {
                 logger.Info(
                     "Development.GameplayTest",
+                    $"Game session '{gameSession.SessionId}' ready for spawn: {gameSession.IsReadyForPlayerSpawn}. " +
                     $"Inventory containers registered: {inventoryService.RegisteredContainerCount}. " +
                     $"Gather check for '{testGatherNodeId}' returned {canGather}.");
                 return;
             }
 
             Debug.Log(
-                $"[Worldforge] [Info] [Development.GameplayTest] Inventory containers registered: " +
+                $"[Worldforge] [Info] [Development.GameplayTest] Game session '{gameSession.SessionId}' " +
+                $"ready for spawn: {gameSession.IsReadyForPlayerSpawn}. Inventory containers registered: " +
                 $"{inventoryService.RegisteredContainerCount}. Gather check for '{testGatherNodeId}' returned {canGather}.");
         }
     }

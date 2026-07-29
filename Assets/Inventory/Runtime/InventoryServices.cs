@@ -22,7 +22,7 @@ namespace Worldforge.Inventory.Services
 
     public sealed class RuntimeInventoryService : IInventoryService
     {
-        private readonly HashSet<string> registeredContainers = new HashSet<string>(StringComparer.Ordinal);
+        private readonly HashSet<string> registeredContainers = new(StringComparer.Ordinal);
 
         public int RegisteredContainerCount
         {
@@ -59,30 +59,30 @@ namespace Worldforge.Inventory.Services
 
         public void RegisterServices(ApplicationBootstrapContext context, IServiceRegistry services)
         {
-            services.AddSingleton<IInventoryService>(_ => new RuntimeInventoryService());
+            services.AddScoped<IInventoryService>(_ => new RuntimeInventoryService());
             services.AddScoped<IInventorySessionService>(_ => new InventorySessionService());
         }
     }
 
-    internal sealed class InventoryInitializationSystemProvider : IApplicationSystemProvider
+    internal sealed class InventoryInitializationSystemProvider : IGameSessionSystemProvider
     {
         public int Order
         {
             get { return 100; }
         }
 
-        public IEnumerable<IApplicationSystem> CreateSystems()
+        public IEnumerable<IGameSessionSystem> CreateSystems()
         {
-            return new IApplicationSystem[]
+            return new IGameSessionSystem[]
             {
                 new InventoryInitializationSystem()
             };
         }
     }
 
-    internal sealed class InventoryInitializationSystem : IApplicationSystem
+    internal sealed class InventoryInitializationSystem : IGameSessionSystem
     {
-        private static readonly IReadOnlyList<string> DependenciesList = new[] { "Input", "SceneFlow" };
+        private static readonly IReadOnlyList<string> NoDependencies = Array.Empty<string>();
 
         private GameObject runtimeRoot;
         private ILogService logger;
@@ -97,19 +97,15 @@ namespace Worldforge.Inventory.Services
             get { return 100; }
         }
 
-        public ApplicationSystemCategory Category
-        {
-            get { return ApplicationSystemCategory.Gameplay; }
-        }
-
         public IReadOnlyList<string> Dependencies
         {
-            get { return DependenciesList; }
+            get { return NoDependencies; }
         }
 
-        public void Initialize(ApplicationBootstrapContext context)
+        public void Initialize(GameSessionContext context)
         {
-            context.Services.Resolve<IInventoryService>();
+            var inventoryService = context.Services.Resolve<IInventoryService>();
+            context.Services.Resolve<IInventorySessionService>();
             logger = context.Services.TryResolve<ILogService>(out var resolvedLogger) ? resolvedLogger : null;
 
             runtimeRoot = new GameObject("Worldforge.Inventory.RuntimeRoot")
@@ -118,7 +114,9 @@ namespace Worldforge.Inventory.Services
             };
 
             context.RegisterTemporaryObject("Gameplay.Inventory.RuntimeRoot", runtimeRoot);
-            context.RegisterSaveOperation("Gameplay.Inventory.SaveRuntimeData", SaveRuntimeData, 100);
+            context.RecordRuntimeState(
+                "inventory.registeredContainerCount",
+                inventoryService.RegisteredContainerCount.ToString(CultureInfo.InvariantCulture));
 
             SceneManager.activeSceneChanged -= OnActiveSceneChanged;
             SceneManager.activeSceneChanged += OnActiveSceneChanged;
@@ -130,18 +128,17 @@ namespace Worldforge.Inventory.Services
             logger?.Info("Gameplay.Inventory", "Inventory gameplay module initialized.");
         }
 
-        public void Shutdown(ApplicationBootstrapContext context)
+        public void Shutdown(GameSessionContext context)
         {
+            if (context.Services.TryResolve<IInventoryService>(out var inventoryService) && inventoryService != null)
+            {
+                context.RecordRuntimeState(
+                    "inventory.registeredContainerCount",
+                    inventoryService.RegisteredContainerCount.ToString(CultureInfo.InvariantCulture));
+            }
+
             runtimeRoot = null;
             logger = null;
-        }
-
-        private static void SaveRuntimeData(ApplicationBootstrapContext context)
-        {
-            var inventoryService = context.Services.Resolve<IInventoryService>();
-            context.RecordRuntimeState(
-                "inventory.registeredContainerCount",
-                inventoryService.RegisteredContainerCount.ToString(CultureInfo.InvariantCulture));
         }
 
         private void OnActiveSceneChanged(Scene previousScene, Scene nextScene)

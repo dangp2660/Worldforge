@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Globalization;
 using UnityEngine;
 using UnityEngine.InputSystem;
-
 namespace Worldforge.Core.Services
 {
     public enum LogLevel
@@ -65,9 +64,25 @@ namespace Worldforge.Core.Services
 
         IReadOnlyList<string> LoadedGameplayModules { get; }
 
+        IReadOnlyList<string> LoadedGameSessionSystems { get; }
+
         string StartupScenePath { get; }
 
         string ActiveScenePath { get; }
+
+        bool HasActiveGameSession { get; }
+
+        Worldforge.Core.Bootstrap.GameSessionState GameSessionState { get; }
+
+        string ActiveGameSessionId { get; }
+
+        bool IsPlayerSpawnPrepared { get; }
+
+        Vector3 PlayerSpawnPosition { get; }
+
+        Quaternion PlayerSpawnRotation { get; }
+
+        string PlayerSpawnSource { get; }
     }
 
     public interface IClockService
@@ -276,6 +291,8 @@ namespace Worldforge.Core.Bootstrap
             services.AddSingleton(context);
             services.AddSingleton<ILogConfiguration>(_ => RuntimeLogConfiguration.CreateDefault());
             services.AddSingleton<ILogService>(resolver => new RuntimeLogService(resolver.Resolve<ILogConfiguration>()));
+            services.AddSingleton<Worldforge.Core.Bootstrap.IGameSessionManager>(
+                _ => new Worldforge.Core.Bootstrap.GameSessionManager(context));
             services.AddSingleton<IApplicationInfoService>(_ => new ApplicationInfoService(context));
             services.AddSingleton<IClockService>(_ => new UnityClockService());
             services.AddSingleton<IInputActionsService>(_ => new InputActionsService(context));
@@ -298,7 +315,25 @@ namespace Worldforge.Core.Bootstrap
 
         public IReadOnlyList<string> LoadedGameplayModules
         {
-            get { return context.LoadedGameplayModules; }
+            get
+            {
+                if (TryGetGameSessionManager(out var gameSessionManager) && gameSessionManager.CurrentSession != null)
+                {
+                    return gameSessionManager.CurrentSession.LoadedSystems;
+                }
+
+                return context.LoadedGameplayModules;
+            }
+        }
+
+        public IReadOnlyList<string> LoadedGameSessionSystems
+        {
+            get
+            {
+                return TryGetGameSessionManager(out var gameSessionManager) && gameSessionManager.CurrentSession != null
+                    ? gameSessionManager.CurrentSession.LoadedSystems
+                    : Array.Empty<string>();
+            }
         }
 
         public string StartupScenePath
@@ -309,6 +344,78 @@ namespace Worldforge.Core.Bootstrap
         public string ActiveScenePath
         {
             get { return context.ActiveScenePath; }
+        }
+
+        public bool HasActiveGameSession
+        {
+            get { return TryGetGameSessionManager(out var gameSessionManager) && gameSessionManager.HasActiveSession; }
+        }
+
+        public Worldforge.Core.Bootstrap.GameSessionState GameSessionState
+        {
+            get
+            {
+                return TryGetGameSessionManager(out var gameSessionManager)
+                    ? gameSessionManager.State
+                    : Worldforge.Core.Bootstrap.GameSessionState.Inactive;
+            }
+        }
+
+        public string ActiveGameSessionId
+        {
+            get
+            {
+                return TryGetGameSessionManager(out var gameSessionManager) && gameSessionManager.CurrentSession != null
+                    ? gameSessionManager.CurrentSession.SessionId.ToString("D")
+                    : string.Empty;
+            }
+        }
+
+        public bool IsPlayerSpawnPrepared
+        {
+            get
+            {
+                return TryGetGameSessionManager(out var gameSessionManager) &&
+                       gameSessionManager.CurrentSession != null &&
+                       gameSessionManager.CurrentSession.IsReadyForPlayerSpawn;
+            }
+        }
+
+        public Vector3 PlayerSpawnPosition
+        {
+            get
+            {
+                return TryGetGameSessionManager(out var gameSessionManager) && gameSessionManager.CurrentSession != null
+                    ? gameSessionManager.CurrentSession.PlayerSpawnPosition
+                    : Vector3.zero;
+            }
+        }
+
+        public Quaternion PlayerSpawnRotation
+        {
+            get
+            {
+                return TryGetGameSessionManager(out var gameSessionManager) && gameSessionManager.CurrentSession != null
+                    ? gameSessionManager.CurrentSession.PlayerSpawnRotation
+                    : Quaternion.identity;
+            }
+        }
+
+        public string PlayerSpawnSource
+        {
+            get
+            {
+                return TryGetGameSessionManager(out var gameSessionManager) && gameSessionManager.CurrentSession != null
+                    ? gameSessionManager.CurrentSession.PlayerSpawnSource
+                    : string.Empty;
+            }
+        }
+
+        private bool TryGetGameSessionManager(out Worldforge.Core.Bootstrap.IGameSessionManager gameSessionManager)
+        {
+            gameSessionManager = null;
+            return context.Services != null &&
+                   context.Services.TryResolve<Worldforge.Core.Bootstrap.IGameSessionManager>(out gameSessionManager);
         }
     }
 

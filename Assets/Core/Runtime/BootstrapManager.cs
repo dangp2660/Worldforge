@@ -152,7 +152,8 @@ namespace Worldforge.Core.Bootstrap
             var systems = new List<IApplicationSystem>
             {
                 new InputBootstrapSystem(),
-                new SceneBootstrapSystem()
+                new SceneBootstrapSystem(),
+                new GameSessionBootstrapSystem()
             };
 
             systems.AddRange(ApplicationSystemDiscovery.DiscoverSystems());
@@ -404,7 +405,12 @@ namespace Worldforge.Core.Bootstrap
 
         public ApplicationBootstrapContext(BootstrapManager manager)
         {
-            Manager = manager ?? throw new ArgumentNullException(nameof(manager));
+            if (manager == null)
+            {
+                throw new ArgumentNullException(nameof(manager));
+            }
+
+            Manager = manager;
         }
 
         public BootstrapManager Manager { get; }
@@ -985,6 +991,922 @@ namespace Worldforge.Core.Bootstrap
         }
     }
 
+    internal sealed class GameSessionBootstrapSystem : IApplicationSystem
+    {
+        private static readonly IReadOnlyList<string> DependenciesList = new[] { "SceneFlow" };
+
+        public string Name
+        {
+            get { return "GameSession"; }
+        }
+
+        public int Order
+        {
+            get { return 15; }
+        }
+
+        public ApplicationSystemCategory Category
+        {
+            get { return ApplicationSystemCategory.Core; }
+        }
+
+        public IReadOnlyList<string> Dependencies
+        {
+            get { return DependenciesList; }
+        }
+
+        public void Initialize(ApplicationBootstrapContext context)
+        {
+            var gameSessionManager = context.Services.Resolve<IGameSessionManager>();
+            var logger = context.GetLoggerOrNull();
+
+            context.RecordRuntimeState("session.activeState", gameSessionManager.State.ToString());
+            logger?.Info("Bootstrap.GameSession", "Game session manager is ready.");
+        }
+
+        public void Shutdown(ApplicationBootstrapContext context)
+        {
+            if (context.Services == null || !context.Services.TryResolve<IGameSessionManager>(out var gameSessionManager))
+            {
+                return;
+            }
+
+            gameSessionManager.ShutdownActiveSession("ApplicationShutdown");
+        }
+    }
+
+    public enum GameSessionState
+    {
+        Inactive,
+        Starting,
+        Running,
+        ShuttingDown
+    }
+
+    public interface IGameSession
+    {
+        Guid SessionId { get; }
+
+        GameSessionState State { get; }
+
+        IServiceResolver Services { get; }
+
+        IReadOnlyList<string> LoadedSystems { get; }
+
+        bool IsReadyForPlayerSpawn { get; }
+
+        Vector3 PlayerSpawnPosition { get; }
+
+        Quaternion PlayerSpawnRotation { get; }
+
+        string PlayerSpawnSource { get; }
+    }
+
+    public interface IGameSessionManager
+    {
+        bool HasActiveSession { get; }
+
+        GameSessionState State { get; }
+
+        IGameSession CurrentSession { get; }
+
+        IGameSession StartNewGame();
+
+        void ShutdownActiveSession(string reason = "SessionShutdown");
+    }
+
+    public interface IGameSessionSystem
+    {
+        string Name { get; }
+
+        int Order { get; }
+
+        IReadOnlyList<string> Dependencies { get; }
+
+        void Initialize(GameSessionContext context);
+
+        void Shutdown(GameSessionContext context);
+    }
+
+    public interface IGameSessionSystemProvider
+    {
+        int Order { get; }
+
+        IEnumerable<IGameSessionSystem> CreateSystems();
+    }
+
+    public sealed class GameSessionContext : IGameSession
+    {
+        private readonly List<string> loadedSystems = new();
+        private readonly HashSet<string> loadedSystemNames = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, string> runtimeState = new(StringComparer.Ordinal);
+        private readonly List<SessionActionRegistration> cleanupOperations = new();
+        private readonly List<SessionResourceRegistration> runtimeResources = new();
+        private readonly List<SessionTemporaryObjectRegistration> temporaryObjects = new();
+
+        private int registrationSequence;
+
+        internal GameSessionContext(
+            ApplicationBootstrapContext applicationContext,
+            GameSessionManager manager,
+            ServiceScope sessionScope,
+            Guid sessionId)
+        {
+            ApplicationContext = applicationContext ?? throw new ArgumentNullException(nameof(applicationContext));
+            Manager = manager ?? throw new ArgumentNullException(nameof(manager));
+            SessionScope = sessionScope ?? throw new ArgumentNullException(nameof(sessionScope));
+            SessionId = sessionId;
+            StartedAtUtc = DateTime.UtcNow;
+            State = GameSessionState.Starting;
+            PlayerSpawnSource = "Unresolved";
+        }
+
+        public ApplicationBootstrapContext ApplicationContext { get; }
+
+        public GameSessionManager Manager { get; }
+
+        public Guid SessionId { get; }
+
+        public DateTime StartedAtUtc { get; }
+
+        public GameSessionState State { get; internal set; }
+
+        public IServiceResolver Services
+        {
+            get { return SessionScope; }
+        }
+
+        public IReadOnlyList<string> LoadedSystems
+        {
+            get { return loadedSystems; }
+        }
+
+        public bool IsReadyForPlayerSpawn { get; private set; }
+
+        public Vector3 PlayerSpawnPosition { get; private set; }
+
+        public Quaternion PlayerSpawnRotation { get; private set; }
+
+        public string PlayerSpawnSource { get; private set; }
+
+        internal ServiceScope SessionScope { get; }
+
+        internal IReadOnlyDictionary<string, string> RuntimeState
+        {
+            get { return runtimeState; }
+        }
+
+        public void RegisterCleanupOperation(string name, Action<GameSessionContext> cleanupOperation, int order = 0)
+        {
+            if (cleanupOperation == null)
+            {
+                throw new ArgumentNullException(nameof(cleanupOperation));
+            }
+
+            cleanupOperations.Add(
+                new SessionActionRegistration(
+                    SanitizeRegistrationName(name, "CleanupOperation"),
+                    cleanupOperation,
+                    order,
+                    registrationSequence++));
+        }
+
+        public void RegisterEventSubscription(string name, Action unsubscribeAction, int order = 0)
+        {
+            if (unsubscribeAction == null)
+            {
+                throw new ArgumentNullException(nameof(unsubscribeAction));
+            }
+
+            RegisterCleanupOperation(
+                SanitizeRegistrationName(name, "EventSubscription"),
+                _ => unsubscribeAction(),
+                order);
+        }
+
+        public void RegisterRuntimeResource(string name, IDisposable resource)
+        {
+            if (resource == null)
+            {
+                return;
+            }
+
+            runtimeResources.Add(
+                new SessionResourceRegistration(
+                    SanitizeRegistrationName(name, "RuntimeResource"),
+                    resource,
+                    registrationSequence++));
+        }
+
+        public void RegisterTemporaryObject(string name, UnityEngine.Object temporaryObject)
+        {
+            if (temporaryObject == null)
+            {
+                return;
+            }
+
+            temporaryObjects.Add(
+                new SessionTemporaryObjectRegistration(
+                    SanitizeRegistrationName(name, "TemporaryObject"),
+                    temporaryObject,
+                    registrationSequence++));
+        }
+
+        public void RecordRuntimeState(string key, string value)
+        {
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                throw new ArgumentException("Runtime state key must be a non-empty value.", nameof(key));
+            }
+
+            runtimeState[key] = value ?? string.Empty;
+        }
+
+        public void PreparePlayerSpawn(Vector3 spawnPosition, Quaternion spawnRotation, string spawnSource)
+        {
+            PlayerSpawnPosition = spawnPosition;
+            PlayerSpawnRotation = spawnRotation;
+            PlayerSpawnSource = string.IsNullOrWhiteSpace(spawnSource) ? "Unknown" : spawnSource.Trim();
+            IsReadyForPlayerSpawn = true;
+
+            RecordRuntimeState(
+                "playerSpawn.position",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "{0:F3},{1:F3},{2:F3}",
+                    spawnPosition.x,
+                    spawnPosition.y,
+                    spawnPosition.z));
+            RecordRuntimeState(
+                "playerSpawn.rotation",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "{0:F3},{1:F3},{2:F3},{3:F3}",
+                    spawnRotation.x,
+                    spawnRotation.y,
+                    spawnRotation.z,
+                    spawnRotation.w));
+            RecordRuntimeState("playerSpawn.source", PlayerSpawnSource);
+            RecordRuntimeState("playerSpawn.isPrepared", bool.TrueString);
+        }
+
+        internal ILogService GetLoggerOrNull()
+        {
+            return Services.TryResolve<ILogService>(out var logger) ? logger : null;
+        }
+
+        internal bool IsSystemLoaded(string systemName)
+        {
+            return !string.IsNullOrWhiteSpace(systemName) && loadedSystemNames.Contains(systemName);
+        }
+
+        internal void MarkSystemLoaded(IGameSessionSystem system)
+        {
+            if (system == null || string.IsNullOrWhiteSpace(system.Name))
+            {
+                return;
+            }
+
+            if (!loadedSystemNames.Add(system.Name))
+            {
+                return;
+            }
+
+            loadedSystems.Add(system.Name);
+        }
+
+        internal List<string> ExecuteCleanupOperations(ICollection<string> shutdownErrors)
+        {
+            var executedOperations = new List<string>();
+            var orderedOperations = new List<SessionActionRegistration>(cleanupOperations);
+            orderedOperations.Sort(CompareCleanupOperations);
+
+            for (var i = 0; i < orderedOperations.Count; i++)
+            {
+                var operation = orderedOperations[i];
+                if (!TryExecuteShutdownStep(operation.Name, () => operation.Action(this), shutdownErrors))
+                {
+                    continue;
+                }
+
+                executedOperations.Add(operation.Name);
+            }
+
+            return executedOperations;
+        }
+
+        internal List<string> ReleaseRuntimeResources(ICollection<string> shutdownErrors)
+        {
+            var releasedResources = new List<string>();
+
+            for (var i = runtimeResources.Count - 1; i >= 0; i--)
+            {
+                var resource = runtimeResources[i];
+                if (!TryExecuteShutdownStep(resource.Name, resource.Resource.Dispose, shutdownErrors))
+                {
+                    continue;
+                }
+
+                releasedResources.Add(resource.Name);
+            }
+
+            return releasedResources;
+        }
+
+        internal List<string> DestroyTemporaryObjects(ICollection<string> shutdownErrors)
+        {
+            var destroyedObjects = new List<string>();
+
+            for (var i = temporaryObjects.Count - 1; i >= 0; i--)
+            {
+                var temporaryObject = temporaryObjects[i];
+                if (temporaryObject.Object == null)
+                {
+                    continue;
+                }
+
+                if (!TryExecuteShutdownStep(
+                        temporaryObject.Name,
+                        () => DestroyTemporaryObject(temporaryObject.Object),
+                        shutdownErrors))
+                {
+                    continue;
+                }
+
+                destroyedObjects.Add(temporaryObject.Name);
+            }
+
+            return destroyedObjects;
+        }
+
+        internal void ClearRegistrations()
+        {
+            cleanupOperations.Clear();
+            runtimeResources.Clear();
+            temporaryObjects.Clear();
+            loadedSystems.Clear();
+            loadedSystemNames.Clear();
+            runtimeState.Clear();
+            IsReadyForPlayerSpawn = false;
+            PlayerSpawnSource = "Unresolved";
+            PlayerSpawnPosition = Vector3.zero;
+            PlayerSpawnRotation = Quaternion.identity;
+            State = GameSessionState.Inactive;
+        }
+
+        internal void DisposeScope()
+        {
+            SessionScope.Dispose();
+        }
+
+        private static int CompareCleanupOperations(SessionActionRegistration left, SessionActionRegistration right)
+        {
+            var orderComparison = right.Order.CompareTo(left.Order);
+            if (orderComparison != 0)
+            {
+                return orderComparison;
+            }
+
+            return right.Sequence.CompareTo(left.Sequence);
+        }
+
+        private static string SanitizeRegistrationName(string name, string fallbackName)
+        {
+            return string.IsNullOrWhiteSpace(name) ? fallbackName : name.Trim();
+        }
+
+        private static void DestroyTemporaryObject(UnityEngine.Object temporaryObject)
+        {
+            if (Application.isPlaying)
+            {
+                UnityEngine.Object.Destroy(temporaryObject);
+                return;
+            }
+
+            UnityEngine.Object.DestroyImmediate(temporaryObject);
+        }
+
+        private bool TryExecuteShutdownStep(string name, Action step, ICollection<string> shutdownErrors)
+        {
+            try
+            {
+                step();
+                return true;
+            }
+            catch (Exception exception)
+            {
+                var message = $"Game session shutdown step '{name}' failed: {exception.Message}";
+                shutdownErrors?.Add(message);
+                GetLoggerOrNull()?.Error("GameSession.Shutdown", message, exception);
+                return false;
+            }
+        }
+    }
+
+    public sealed class GameSessionManager : IGameSessionManager
+    {
+        private readonly ApplicationBootstrapContext applicationContext;
+        private readonly List<IGameSessionSystem> executionPlan = new();
+
+        private GameSessionContext activeSession;
+
+        public GameSessionManager(ApplicationBootstrapContext applicationContext)
+        {
+            this.applicationContext = applicationContext ?? throw new ArgumentNullException(nameof(applicationContext));
+        }
+
+        public bool HasActiveSession
+        {
+            get { return activeSession != null; }
+        }
+
+        public GameSessionState State
+        {
+            get { return activeSession != null ? activeSession.State : GameSessionState.Inactive; }
+        }
+
+        public IGameSession CurrentSession
+        {
+            get { return activeSession; }
+        }
+
+        public IGameSession StartNewGame()
+        {
+            if (applicationContext.Services == null)
+            {
+                throw new InvalidOperationException("Application services are not available for game sessions.");
+            }
+
+            if (activeSession != null)
+            {
+                ShutdownActiveSession("StartNewGame.Restart");
+            }
+
+            var sessionContext = new GameSessionContext(
+                applicationContext,
+                this,
+                applicationContext.Services.CreateScope(),
+                Guid.NewGuid());
+
+            activeSession = sessionContext;
+            executionPlan.Clear();
+
+            try
+            {
+                var logger = sessionContext.GetLoggerOrNull();
+                var declaredSystems = GameSessionSystemDiscovery.DiscoverSystems();
+                executionPlan.AddRange(BuildExecutionPlan(declaredSystems, logger));
+
+                for (var i = 0; i < executionPlan.Count; i++)
+                {
+                    var system = executionPlan[i];
+                    if (sessionContext.IsSystemLoaded(system.Name))
+                    {
+                        continue;
+                    }
+
+                    system.Initialize(sessionContext);
+                    sessionContext.MarkSystemLoaded(system);
+                }
+
+                ResolvePlayerSpawn(sessionContext);
+                sessionContext.State = GameSessionState.Running;
+                RecordSessionStart(sessionContext);
+
+                logger?.Info(
+                    "GameSession.Start",
+                    string.Format(
+                        CultureInfo.InvariantCulture,
+                        "Started game session '{0}' with {1} session system(s).",
+                        sessionContext.SessionId,
+                        sessionContext.LoadedSystems.Count));
+
+                return sessionContext;
+            }
+            catch (Exception exception)
+            {
+                sessionContext.GetLoggerOrNull()?.Error("GameSession.Start", "Failed to start game session.", exception);
+                ShutdownSessionInternal(sessionContext, "SessionStartFailed", false);
+                throw;
+            }
+        }
+
+        public void ShutdownActiveSession(string reason = "SessionShutdown")
+        {
+            if (activeSession == null)
+            {
+                return;
+            }
+
+            ShutdownSessionInternal(activeSession, reason, true);
+        }
+
+        private static IReadOnlyList<IGameSessionSystem> BuildExecutionPlan(
+            IReadOnlyList<IGameSessionSystem> systems,
+            ILogService logger)
+        {
+            var uniqueSystems = new Dictionary<string, IGameSessionSystem>(StringComparer.Ordinal);
+
+            for (var i = 0; i < systems.Count; i++)
+            {
+                var system = systems[i];
+                if (system == null)
+                {
+                    continue;
+                }
+
+                if (string.IsNullOrWhiteSpace(system.Name))
+                {
+                    throw new InvalidOperationException("Game session system name must be a non-empty value.");
+                }
+
+                if (uniqueSystems.ContainsKey(system.Name))
+                {
+                    logger?.Warning(
+                        "GameSession.ExecutionPlan",
+                        string.Format(
+                            CultureInfo.InvariantCulture,
+                            "Ignoring duplicate game session system '{0}'.",
+                            system.Name));
+                    continue;
+                }
+
+                uniqueSystems.Add(system.Name, system);
+            }
+
+            var resolved = new List<IGameSessionSystem>(uniqueSystems.Count);
+            var visitStates = new Dictionary<string, VisitState>(StringComparer.Ordinal);
+
+            var candidates = new List<IGameSessionSystem>(uniqueSystems.Values);
+            candidates.Sort(GameSessionSystemDiscovery.CompareSystems);
+
+            for (var i = 0; i < candidates.Count; i++)
+            {
+                VisitSystem(candidates[i], uniqueSystems, visitStates, resolved);
+            }
+
+            return resolved;
+        }
+
+        private static void VisitSystem(
+            IGameSessionSystem system,
+            IReadOnlyDictionary<string, IGameSessionSystem> systems,
+            IDictionary<string, VisitState> visitStates,
+            IList<IGameSessionSystem> resolved)
+        {
+            if (visitStates.TryGetValue(system.Name, out var state))
+            {
+                if (state == VisitState.Visited)
+                {
+                    return;
+                }
+
+                if (state == VisitState.Visiting)
+                {
+                    throw new InvalidOperationException(
+                        $"Circular game session system dependency detected at '{system.Name}'.");
+                }
+            }
+
+            visitStates[system.Name] = VisitState.Visiting;
+
+            var dependencies = system.Dependencies ?? Array.Empty<string>();
+            for (var i = 0; i < dependencies.Count; i++)
+            {
+                var dependencyName = dependencies[i];
+                if (string.IsNullOrWhiteSpace(dependencyName))
+                {
+                    continue;
+                }
+
+                if (!systems.TryGetValue(dependencyName, out var dependency))
+                {
+                    throw new InvalidOperationException(
+                        $"Game session system '{system.Name}' depends on missing system '{dependencyName}'.");
+                }
+
+                VisitSystem(dependency, systems, visitStates, resolved);
+            }
+
+            visitStates[system.Name] = VisitState.Visited;
+            resolved.Add(system);
+        }
+
+        private void ShutdownSessionInternal(GameSessionContext sessionContext, string reason, bool preserveRecordedState)
+        {
+            if (sessionContext == null || sessionContext.State == GameSessionState.ShuttingDown)
+            {
+                return;
+            }
+
+            sessionContext.State = GameSessionState.ShuttingDown;
+
+            var shutdownErrors = new List<string>();
+
+            for (var i = executionPlan.Count - 1; i >= 0; i--)
+            {
+                var system = executionPlan[i];
+
+                try
+                {
+                    system.Shutdown(sessionContext);
+                }
+                catch (Exception exception)
+                {
+                    var message = $"Game session system '{system.Name}' failed during shutdown: {exception.Message}";
+                    shutdownErrors.Add(message);
+                    sessionContext.GetLoggerOrNull()?.Error("GameSession.Shutdown", message, exception);
+                }
+            }
+
+            var cleanupOperations = sessionContext.ExecuteCleanupOperations(shutdownErrors);
+            var releasedResources = sessionContext.ReleaseRuntimeResources(shutdownErrors);
+            var destroyedObjects = sessionContext.DestroyTemporaryObjects(shutdownErrors);
+
+            if (preserveRecordedState)
+            {
+                RecordSessionShutdown(
+                    sessionContext,
+                    reason,
+                    shutdownErrors.Count,
+                    cleanupOperations.Count,
+                    releasedResources.Count,
+                    destroyedObjects.Count);
+            }
+
+            sessionContext.DisposeScope();
+            sessionContext.ClearRegistrations();
+            executionPlan.Clear();
+
+            if (ReferenceEquals(activeSession, sessionContext))
+            {
+                activeSession = null;
+            }
+        }
+
+        private void ResolvePlayerSpawn(GameSessionContext sessionContext)
+        {
+            var spawnPoints = UnityEngine.Object.FindObjectsByType<GameSessionSpawnPoint>(FindObjectsInactive.Exclude);
+            GameSessionSpawnPoint selectedSpawnPoint = null;
+
+            for (var i = 0; i < spawnPoints.Length; i++)
+            {
+                var candidate = spawnPoints[i];
+                if (candidate == null || !candidate.isActiveAndEnabled)
+                {
+                    continue;
+                }
+
+                if (selectedSpawnPoint == null || candidate.Priority > selectedSpawnPoint.Priority)
+                {
+                    selectedSpawnPoint = candidate;
+                }
+            }
+
+            if (selectedSpawnPoint != null)
+            {
+                sessionContext.PreparePlayerSpawn(
+                    selectedSpawnPoint.transform.position,
+                    selectedSpawnPoint.transform.rotation,
+                    selectedSpawnPoint.name);
+                return;
+            }
+
+            sessionContext.GetLoggerOrNull()?.Warning(
+                "GameSession.Spawn",
+                "No GameSessionSpawnPoint was found in the active scene. Falling back to world origin.");
+            sessionContext.PreparePlayerSpawn(Vector3.zero, Quaternion.identity, "FallbackOrigin");
+        }
+
+        private void RecordSessionStart(GameSessionContext sessionContext)
+        {
+            applicationContext.RecordRuntimeState("session.activeState", sessionContext.State.ToString());
+            applicationContext.RecordRuntimeState("session.activeSessionId", sessionContext.SessionId.ToString("D"));
+            applicationContext.RecordRuntimeState(
+                "session.activeLoadedSystemCount",
+                sessionContext.LoadedSystems.Count.ToString(CultureInfo.InvariantCulture));
+            applicationContext.RecordRuntimeState(
+                "session.activePlayerSpawnPrepared",
+                sessionContext.IsReadyForPlayerSpawn.ToString());
+        }
+
+        private void RecordSessionShutdown(
+            GameSessionContext sessionContext,
+            string reason,
+            int shutdownErrorCount,
+            int cleanupOperationCount,
+            int releasedResourceCount,
+            int destroyedObjectCount)
+        {
+            applicationContext.RecordRuntimeState("session.activeState", GameSessionState.Inactive.ToString());
+            applicationContext.RecordRuntimeState("session.lastSessionId", sessionContext.SessionId.ToString("D"));
+            applicationContext.RecordRuntimeState("session.lastShutdownReason", reason ?? "SessionShutdown");
+            applicationContext.RecordRuntimeState(
+                "session.lastLoadedSystemCount",
+                sessionContext.LoadedSystems.Count.ToString(CultureInfo.InvariantCulture));
+            applicationContext.RecordRuntimeState(
+                "session.lastShutdownErrorCount",
+                shutdownErrorCount.ToString(CultureInfo.InvariantCulture));
+            applicationContext.RecordRuntimeState(
+                "session.lastCleanupOperationCount",
+                cleanupOperationCount.ToString(CultureInfo.InvariantCulture));
+            applicationContext.RecordRuntimeState(
+                "session.lastReleasedResourceCount",
+                releasedResourceCount.ToString(CultureInfo.InvariantCulture));
+            applicationContext.RecordRuntimeState(
+                "session.lastDestroyedObjectCount",
+                destroyedObjectCount.ToString(CultureInfo.InvariantCulture));
+            applicationContext.RecordRuntimeState(
+                "session.lastPlayerSpawnPrepared",
+                sessionContext.IsReadyForPlayerSpawn.ToString());
+            applicationContext.RecordRuntimeState(
+                "session.lastPlayerSpawnSource",
+                sessionContext.PlayerSpawnSource ?? string.Empty);
+
+            foreach (var pair in sessionContext.RuntimeState)
+            {
+                applicationContext.RecordRuntimeState($"session.{pair.Key}", pair.Value);
+            }
+        }
+    }
+
+    public sealed class GameSessionSpawnPoint : MonoBehaviour
+    {
+        [SerializeField] private int priority;
+
+        public int Priority
+        {
+            get { return priority; }
+        }
+    }
+
+    internal static class GameSessionSystemDiscovery
+    {
+        public static IReadOnlyList<IGameSessionSystem> DiscoverSystems()
+        {
+            var providers = DiscoverProviders();
+            var systems = new List<IGameSessionSystem>();
+
+            for (var i = 0; i < providers.Count; i++)
+            {
+                var createdSystems = providers[i].CreateSystems();
+                if (createdSystems == null)
+                {
+                    continue;
+                }
+
+                foreach (var system in createdSystems)
+                {
+                    if (system != null)
+                    {
+                        systems.Add(system);
+                    }
+                }
+            }
+
+            systems.Sort(CompareSystems);
+            return systems;
+        }
+
+        internal static int CompareSystems(IGameSessionSystem left, IGameSessionSystem right)
+        {
+            var orderComparison = left.Order.CompareTo(right.Order);
+            if (orderComparison != 0)
+            {
+                return orderComparison;
+            }
+
+            return StringComparer.Ordinal.Compare(left.Name, right.Name);
+        }
+
+        private static IReadOnlyList<IGameSessionSystemProvider> DiscoverProviders()
+        {
+            var providers = new List<IGameSessionSystemProvider>();
+            var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+
+            for (var i = 0; i < assemblies.Length; i++)
+            {
+                var assembly = assemblies[i];
+                if (assembly == null || assembly.IsDynamic)
+                {
+                    continue;
+                }
+
+                var types = GetLoadableTypes(assembly);
+                for (var j = 0; j < types.Length; j++)
+                {
+                    var type = types[j];
+                    if (type == null ||
+                        type.IsAbstract ||
+                        type.IsInterface ||
+                        type.ContainsGenericParameters ||
+                        !typeof(IGameSessionSystemProvider).IsAssignableFrom(type))
+                    {
+                        continue;
+                    }
+
+                    if (type.GetConstructor(
+                            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                            null,
+                            Type.EmptyTypes,
+                            null) == null)
+                    {
+                        continue;
+                    }
+
+                    if (Activator.CreateInstance(type, true) is IGameSessionSystemProvider provider)
+                    {
+                        providers.Add(provider);
+                    }
+                }
+            }
+
+            providers.Sort(CompareProviders);
+            return providers;
+        }
+
+        private static int CompareProviders(IGameSessionSystemProvider left, IGameSessionSystemProvider right)
+        {
+            var orderComparison = left.Order.CompareTo(right.Order);
+            if (orderComparison != 0)
+            {
+                return orderComparison;
+            }
+
+            var leftName = left.GetType().FullName ?? left.GetType().Name;
+            var rightName = right.GetType().FullName ?? right.GetType().Name;
+            return StringComparer.Ordinal.Compare(leftName, rightName);
+        }
+
+        private static Type[] GetLoadableTypes(Assembly assembly)
+        {
+            try
+            {
+                return assembly.GetTypes();
+            }
+            catch (ReflectionTypeLoadException exception)
+            {
+                return Array.FindAll(exception.Types, type => type != null);
+            }
+        }
+    }
+
+    internal sealed class SessionActionRegistration
+    {
+        public SessionActionRegistration(string name, Action<GameSessionContext> action, int order, int sequence)
+        {
+            Name = name;
+            Action = action ?? throw new ArgumentNullException(nameof(action));
+            Order = order;
+            Sequence = sequence;
+        }
+
+        public string Name { get; }
+
+        public Action<GameSessionContext> Action { get; }
+
+        public int Order { get; }
+
+        public int Sequence { get; }
+    }
+
+    internal sealed class SessionResourceRegistration
+    {
+        public SessionResourceRegistration(string name, IDisposable resource, int sequence)
+        {
+            Name = name;
+            Resource = resource ?? throw new ArgumentNullException(nameof(resource));
+            Sequence = sequence;
+        }
+
+        public string Name { get; }
+
+        public IDisposable Resource { get; }
+
+        public int Sequence { get; }
+    }
+
+    internal sealed class SessionTemporaryObjectRegistration
+    {
+        public SessionTemporaryObjectRegistration(string name, UnityEngine.Object temporaryObject, int sequence)
+        {
+            if (temporaryObject == null)
+            {
+                throw new ArgumentNullException(nameof(temporaryObject));
+            }
+
+            Name = name;
+            Object = temporaryObject;
+            Sequence = sequence;
+        }
+
+        public string Name { get; }
+
+        public UnityEngine.Object Object { get; }
+
+        public int Sequence { get; }
+    }
+
     internal static class ApplicationSystemDiscovery
     {
         public static IReadOnlyList<IApplicationSystem> DiscoverSystems()
@@ -1141,8 +2063,13 @@ namespace Worldforge.Core.Bootstrap
     {
         public TemporaryObjectRegistration(string name, UnityEngine.Object temporaryObject, int sequence)
         {
+            if (temporaryObject == null)
+            {
+                throw new ArgumentNullException(nameof(temporaryObject));
+            }
+
             Name = name;
-            Object = temporaryObject ?? throw new ArgumentNullException(nameof(temporaryObject));
+            Object = temporaryObject;
             Sequence = sequence;
         }
 

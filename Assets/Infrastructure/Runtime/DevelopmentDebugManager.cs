@@ -29,11 +29,11 @@ namespace Worldforge.Infrastructure.Development
         [SerializeField] private Key quitSessionKey = Key.F10;
 
         [Header("Gizmos")]
-        [SerializeField] private Color environmentBoundsColor = new Color(0.22f, 0.78f, 1f, 0.95f);
-        [SerializeField] private Color spawnPointColor = new Color(0.32f, 1f, 0.45f, 0.95f);
-        [SerializeField] private Color markerColor = new Color(1f, 0.78f, 0.18f, 0.95f);
-        [SerializeField] private Color cameraForwardColor = new Color(1f, 0.35f, 0.35f, 0.95f);
-        [SerializeField] private Vector3 environmentBoundsSize = new Vector3(40f, 0.25f, 40f);
+        [SerializeField] private Color environmentBoundsColor = new(0.22f, 0.78f, 1f, 0.95f);
+        [SerializeField] private Color spawnPointColor = new(0.32f, 1f, 0.45f, 0.95f);
+        [SerializeField] private Color markerColor = new(1f, 0.78f, 0.18f, 0.95f);
+        [SerializeField] private Color cameraForwardColor = new(1f, 0.35f, 0.35f, 0.95f);
+        [SerializeField] private Vector3 environmentBoundsSize = new(40f, 0.25f, 40f);
         [SerializeField] private float markerSphereRadius = 0.45f;
         [SerializeField] private float cameraForwardLength = 8f;
 
@@ -348,11 +348,24 @@ namespace Worldforge.Infrastructure.Development
         {
             var startupScenePath = bootstrapContext?.StartupScenePath;
             var activeScenePath = SceneManager.GetActiveScene().path;
+            var hasActiveGameSession = false;
+            var gameSessionState = Worldforge.Core.Bootstrap.GameSessionState.Inactive;
+            var activeGameSessionId = "None";
+            var playerSpawnSource = "Unknown";
+            var loadedSessionSystems = "None";
 
             if (BootstrapManager.TryResolve<IApplicationInfoService>(out var applicationInfo) && applicationInfo != null)
             {
                 startupScenePath = applicationInfo.StartupScenePath;
                 activeScenePath = applicationInfo.ActiveScenePath;
+                hasActiveGameSession = applicationInfo.HasActiveGameSession;
+                gameSessionState = applicationInfo.GameSessionState;
+                activeGameSessionId = ValueOrFallback(applicationInfo.ActiveGameSessionId);
+                playerSpawnSource = ValueOrFallback(applicationInfo.PlayerSpawnSource);
+                loadedSessionSystems = applicationInfo.LoadedGameSessionSystems != null &&
+                                       applicationInfo.LoadedGameSessionSystems.Count > 0
+                    ? string.Join(", ", applicationInfo.LoadedGameSessionSystems)
+                    : "None";
             }
 
             var systems = bootstrapContext?.LoadedSystems != null && bootstrapContext.LoadedSystems.Count > 0
@@ -363,7 +376,9 @@ namespace Worldforge.Infrastructure.Development
                 : "None";
 
             return $"Startup scene: {ValueOrFallback(startupScenePath)}, active scene: {ValueOrFallback(activeScenePath)}, " +
-                   $"systems: [{systems}], gameplay modules: [{modules}].";
+                   $"systems: [{systems}], gameplay modules: [{modules}], session active: {hasActiveGameSession}, " +
+                   $"session state: {gameSessionState}, session id: {activeGameSessionId}, " +
+                   $"session systems: [{loadedSessionSystems}], spawn source: {playerSpawnSource}.";
         }
 
         public void ToggleOverlay()
