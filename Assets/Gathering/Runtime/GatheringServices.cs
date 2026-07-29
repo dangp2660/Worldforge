@@ -36,30 +36,30 @@ namespace Worldforge.Gathering.Services
 
         public void RegisterServices(ApplicationBootstrapContext context, IServiceRegistry services)
         {
-            services.AddTransient<IGatheringService>(_ => new RuntimeGatheringService());
+            services.AddScoped<IGatheringService>(_ => new RuntimeGatheringService());
         }
     }
 
-    internal sealed class GatheringInitializationSystemProvider : IApplicationSystemProvider
+    internal sealed class GatheringInitializationSystemProvider : Worldforge.Core.Bootstrap.IGameSessionSystemProvider
     {
         public int Order
         {
             get { return 110; }
         }
 
-        public System.Collections.Generic.IEnumerable<IApplicationSystem> CreateSystems()
+        public System.Collections.Generic.IEnumerable<Worldforge.Core.Bootstrap.IGameSessionSystem> CreateSystems()
         {
-            return new IApplicationSystem[]
+            return new Worldforge.Core.Bootstrap.IGameSessionSystem[]
             {
                 new GatheringInitializationSystem()
             };
         }
     }
 
-    internal sealed class GatheringInitializationSystem : IApplicationSystem
+    internal sealed class GatheringInitializationSystem : Worldforge.Core.Bootstrap.IGameSessionSystem
     {
         private static readonly System.Collections.Generic.IReadOnlyList<string> DependenciesList =
-            new[] { "SceneFlow", "Gameplay.Inventory" };
+            new[] { "Gameplay.Inventory" };
 
         public string Name
         {
@@ -71,32 +71,25 @@ namespace Worldforge.Gathering.Services
             get { return 110; }
         }
 
-        public ApplicationSystemCategory Category
-        {
-            get { return ApplicationSystemCategory.Gameplay; }
-        }
-
         public System.Collections.Generic.IReadOnlyList<string> Dependencies
         {
             get { return DependenciesList; }
         }
 
-        public void Initialize(ApplicationBootstrapContext context)
+        public void Initialize(Worldforge.Core.Bootstrap.GameSessionContext context)
         {
             context.Services.Resolve<IInventoryService>();
             context.Services.Resolve<IGatheringService>();
             var logger = context.Services.TryResolve<ILogService>(out var resolvedLogger) ? resolvedLogger : null;
-            context.RegisterSaveOperation(
-                "Gameplay.Gathering.SaveRuntimeData",
-                currentContext => currentContext.RecordRuntimeState("gathering.serviceLifetime", ServiceLifetime.Transient.ToString()),
-                110);
+            context.RecordRuntimeState("gathering.serviceLifetime", ServiceLifetime.Scoped.ToString());
             context.RegisterRuntimeResource("Gameplay.Gathering.RuntimeCache", new GatheringRuntimeCache());
 
             logger?.Info("Gameplay.Gathering", "Gathering gameplay module initialized.");
         }
 
-        public void Shutdown(ApplicationBootstrapContext context)
+        public void Shutdown(Worldforge.Core.Bootstrap.GameSessionContext context)
         {
+            context.RecordRuntimeState("gathering.serviceLifetime", ServiceLifetime.Scoped.ToString());
         }
     }
 

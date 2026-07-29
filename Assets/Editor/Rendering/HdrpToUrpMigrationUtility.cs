@@ -103,11 +103,8 @@ public static class HdrpToUrpMigrationUtility
     {
         var serializedObject = new SerializedObject(pipelineAsset);
 
-        var rendererList = serializedObject.FindProperty("m_RendererDataList");
-        if (rendererList == null)
-        {
-            throw new MissingFieldException("Could not find m_RendererDataList on the URP pipeline asset.");
-        }
+        var rendererList = serializedObject.FindProperty("m_RendererDataList")
+            ?? throw new MissingFieldException("Could not find m_RendererDataList on the URP pipeline asset.");
 
         rendererList.arraySize = 1;
         rendererList.GetArrayElementAtIndex(0).objectReferenceValue = rendererData;
@@ -197,9 +194,29 @@ public static class HdrpToUrpMigrationUtility
                 EditorUtility.SetDirty(volume);
                 modified = true;
             }
+
+            var light = gameObject.GetComponent<Light>();
+            if (NormalizeDirectionalLightForUrp(light))
+            {
+                modified = true;
+            }
         }
 
         return modified;
+    }
+
+    private static bool NormalizeDirectionalLightForUrp(Light light)
+    {
+        // HDRP migration can leave sunlight at physical lux values (for example 100000),
+        // which will blow out a URP scene when no exposure setup exists yet.
+        if (light == null || light.type != LightType.Directional || light.intensity <= 20f)
+        {
+            return false;
+        }
+
+        light.intensity = 2f;
+        EditorUtility.SetDirty(light);
+        return true;
     }
 
     private static void SetBoolIfPresent(SerializedObject serializedObject, string propertyName, bool value)
