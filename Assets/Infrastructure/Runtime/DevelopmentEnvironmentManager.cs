@@ -1,4 +1,5 @@
 using UnityEngine;
+using Worldforge.Character.Spawning;
 
 namespace Worldforge.Infrastructure.Development
 {
@@ -78,6 +79,7 @@ namespace Worldforge.Infrastructure.Development
             spawnAnchor.transform.SetParent(EnvironmentRoot, false);
             spawnAnchor.transform.SetLocalPositionAndRotation(new Vector3(0f, floorHeight, 0f), Quaternion.identity);
             spawnAnchor.transform.localScale = Vector3.one;
+            spawnAnchor.AddComponent<PlayerSpawnPoint>();
         }
     }
 }

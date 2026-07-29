@@ -833,7 +833,7 @@ PlayerSettings:
   webWasm2023: 0
   webEnableSubmoduleStrippingCompatibility: 0
   scriptingDefineSymbols:
-    Standalone: SENTIS_ANALYTICS_ENABLED;APP_UI_EDITOR_ONLY;WORLDFORGE_DEVELOPMENT_BUILD
+    Standalone: SENTIS_ANALYTICS_ENABLED;APP_UI_EDITOR_ONLY;WORLDFORGE_DEVELOPMENT_BUILD;WORLDFORGE_DEBUG_TOOLS
   additionalCompilerArguments: {}
   platformArchitecture: {}
   scriptingBackend:
