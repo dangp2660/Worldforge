@@ -8,7 +8,13 @@ namespace Worldforge.Character.Spawning
 
         GameObject ActivePlayer { get; }
 
+        string SelectedSpawnId { get; set; }
+
         GameObject Spawn(PlayerSpawnRequest request);
+
+        GameObject SpawnAt(PlayerSpawnLocation location);
+
+        void TeleportActivePlayer(PlayerSpawnLocation location);
 
         void DespawnActivePlayer();
     }

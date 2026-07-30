@@ -71,12 +71,12 @@ namespace Worldforge.Character.Spawning
                 return;
             }
 
-            var spawnPoint = FindDefaultSpawnPoint(scene);
+            var spawnPoint = FindSpawnPoint(scene, spawnService.SelectedSpawnId);
             if (spawnPoint == null)
             {
                 logger?.Warning(
                     "Gameplay.PlayerSpawn",
-                    $"No default player spawn point was found in scene '{scene.path}'.");
+                    $"No valid player spawn point was found in scene '{scene.path}'.");
 
                 return;
             }
@@ -115,38 +115,63 @@ namespace Worldforge.Character.Spawning
             }
         }
 
-        private PlayerSpawnPoint FindDefaultSpawnPoint(Scene scene)
+        private PlayerSpawnPoint FindSpawnPoint(Scene scene, string targetSpawnId)
         {
             var spawnPoints = UnityEngine.Object.FindObjectsByType<PlayerSpawnPoint>(
                 FindObjectsInactive.Exclude);
 
+            PlayerSpawnPoint matchedSpawnPoint = null;
             PlayerSpawnPoint defaultSpawnPoint = null;
+            PlayerSpawnPoint fallbackSpawnPoint = null;
+
+            var hasTarget = !string.IsNullOrWhiteSpace(targetSpawnId);
 
             for (var i = 0; i < spawnPoints.Length; i++)
             {
                 var spawnPoint = spawnPoints[i];
 
-                if (spawnPoint == null ||
-                    spawnPoint.gameObject.scene.handle != scene.handle ||
-                    !spawnPoint.IsDefault)
+                if (spawnPoint == null || spawnPoint.gameObject.scene.handle != scene.handle)
                 {
                     continue;
                 }
 
-                if (defaultSpawnPoint != null)
-                {
-                    logger?.Warning(
-                        "Gameplay.PlayerSpawn",
-                        $"Multiple default player spawn points found in scene '{scene.path}'. " +
-                        $"Using '{defaultSpawnPoint.SpawnId}'.");
+                fallbackSpawnPoint ??= spawnPoint;
 
-                    continue;
+                if (hasTarget && string.Equals(spawnPoint.SpawnId, targetSpawnId, StringComparison.OrdinalIgnoreCase))
+                {
+                    matchedSpawnPoint = spawnPoint;
+                    break;
                 }
 
-                defaultSpawnPoint = spawnPoint;
+                if (spawnPoint.IsDefault)
+                {
+                    if (defaultSpawnPoint != null)
+                    {
+                        logger?.Warning(
+                            "Gameplay.PlayerSpawn",
+                            $"Multiple default player spawn points found in scene '{scene.path}'. " +
+                            $"Using '{defaultSpawnPoint.SpawnId}'.");
+
+                        continue;
+                    }
+
+                    defaultSpawnPoint = spawnPoint;
+                }
             }
 
-            return defaultSpawnPoint;
+            if (matchedSpawnPoint != null)
+            {
+                return matchedSpawnPoint;
+            }
+
+            if (hasTarget)
+            {
+                logger?.Warning(
+                    "Gameplay.PlayerSpawn",
+                    $"Target spawn point '{targetSpawnId}' was not found in scene '{scene.path}'. Falling back to default or available spawn point.");
+            }
+
+            return defaultSpawnPoint ?? fallbackSpawnPoint;
         }
     }
 }

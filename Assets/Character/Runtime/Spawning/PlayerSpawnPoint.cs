@@ -29,5 +29,21 @@ namespace Worldforge.Character.Spawning
         {
             spawnId = spawnId?.Trim();
         }
+
+#if UNITY_EDITOR
+        private void OnDrawGizmos()
+        {
+            Gizmos.color = isDefault ? Color.green : Color.cyan;
+            Gizmos.DrawWireSphere(transform.position, 0.5f);
+            Gizmos.DrawRay(transform.position, transform.forward * 1f);
+        }
+
+        private void OnDrawGizmosSelected()
+        {
+            Gizmos.color = Color.yellow;
+            Gizmos.DrawWireSphere(transform.position, 0.7f);
+            Gizmos.DrawRay(transform.position, transform.forward * 1.5f);
+        }
+#endif
     }
 }

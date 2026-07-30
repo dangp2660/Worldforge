@@ -7,6 +7,22 @@ namespace Worldforge.Character.Spawning
     menuName = "Worldforge/Character/Player Spawn Configuration")]
     public sealed class PlayerSpawnConfiguration : ScriptableObject
     {
-        public GameObject PlayerPrefab;
+        [SerializeField] private GameObject playerPrefab;
+        [SerializeField] private string defaultSpawnId = "default";
+
+        public GameObject PlayerPrefab
+        {
+            get { return playerPrefab; }
+        }
+
+        public string DefaultSpawnId
+        {
+            get { return defaultSpawnId; }
+        }
+
+        private void OnValidate()
+        {
+            defaultSpawnId = defaultSpawnId?.Trim();
+        }
     }
 }

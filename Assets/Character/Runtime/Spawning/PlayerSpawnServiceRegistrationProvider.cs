@@ -35,7 +35,8 @@ namespace Worldforge.Character.Spawning
                 }
 
                 return new RuntimePlayerSpawnService(
-                    () => playerFactory.CreatePlayer(playerPrefab));
+                    () => playerFactory.CreatePlayer(playerPrefab),
+                    configuration.DefaultSpawnId);
             });
         }
     }

@@ -8,10 +8,12 @@ namespace Worldforge.Character.Spawning
         private readonly Func<GameObject> playerFactory;
 
         private GameObject activePlayer;
+        private string _selectedSpawnId;
 
-        public RuntimePlayerSpawnService(Func<GameObject> playerFactory)
+        public RuntimePlayerSpawnService(Func<GameObject> playerFactory, string defaultSpawnId = null)
         {
             this.playerFactory = playerFactory ?? throw new ArgumentNullException(nameof(playerFactory));
+            _selectedSpawnId = defaultSpawnId?.Trim();
         }
 
         public bool HasActivePlayer
@@ -22,6 +24,12 @@ namespace Worldforge.Character.Spawning
         public GameObject ActivePlayer
         {
             get { return activePlayer; }
+        }
+
+        public string SelectedSpawnId
+        {
+            get { return _selectedSpawnId; }
+            set { _selectedSpawnId = value?.Trim(); }
         }
 
         public GameObject Spawn(PlayerSpawnRequest request)
@@ -44,6 +52,25 @@ namespace Worldforge.Character.Spawning
 
             activePlayer = player;
             return activePlayer;
+        }
+
+        public GameObject SpawnAt(PlayerSpawnLocation location)
+        {
+            const string localPlayerId = "local-player";
+            var request = new PlayerSpawnRequest(localPlayerId, location);
+            return Spawn(request);
+        }
+
+        public void TeleportActivePlayer(PlayerSpawnLocation location)
+        {
+            if (activePlayer == null)
+            {
+                return;
+            }
+
+            activePlayer.transform.SetPositionAndRotation(
+                location.Position,
+                location.Rotation);
         }
 
         public void DespawnActivePlayer()
