@@ -12,4 +12,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0d92a0c24f34db846a0b0407fe1fb916, type: 3}
   m_Name: PlayerSpawnConfiguration
   m_EditorClassIdentifier: Character::Worldforge.Character.Spawning.PlayerSpawnConfiguration
-  PlayerPrefab: {fileID: 0}
+  playerPrefab: {fileID: 0}
+  defaultSpawnId: village
