@@ -16,5 +16,7 @@ namespace Worldforge.Infrastructure.Cameras
         void BindToTarget(Transform target);
 
         void ClearTarget();
+
+        void ApplyConfiguration(CameraFollowConfiguration configuration);
     }
 }

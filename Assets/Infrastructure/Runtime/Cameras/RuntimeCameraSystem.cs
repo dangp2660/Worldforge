@@ -10,6 +10,8 @@ namespace Worldforge.Infrastructure.Cameras
 {
     public sealed class CameraRuntimeServiceRegistrationProvider : IServiceRegistrationProvider
     {
+        private const string ConfigurationResourcePath = "CameraFollowConfiguration";
+
         public int Order
         {
             get { return 130; }
@@ -17,11 +19,21 @@ namespace Worldforge.Infrastructure.Cameras
 
         public void RegisterServices(ApplicationBootstrapContext context, IServiceRegistry services)
         {
+            var followConfiguration = Resources.Load<CameraFollowConfiguration>(ConfigurationResourcePath);
+
             services.AddSingleton<ICameraRuntimeService>(resolver =>
             {
                 var playerSpawnService = resolver.Resolve<IPlayerSpawnService>();
                 var logger = resolver.TryResolve<ILogService>(out var resolvedLogger) ? resolvedLogger : null;
-                return new RuntimeCameraService(playerSpawnService, logger);
+
+                if (followConfiguration == null)
+                {
+                    logger?.Warning(
+                        "Infrastructure.Camera",
+                        $"Camera follow configuration was not found at Resources/{ConfigurationResourcePath}. Using default values.");
+                }
+
+                return new RuntimeCameraService(playerSpawnService, followConfiguration, logger);
             });
         }
     }
@@ -136,32 +148,37 @@ namespace Worldforge.Infrastructure.Cameras
 
     internal sealed class RuntimeCameraService : ICameraRuntimeService, IDisposable
     {
-        private readonly IPlayerSpawnService playerSpawnService;
-        private readonly ILogService logger;
+        private readonly IPlayerSpawnService _playerSpawnService;
+        private readonly ILogService _logger;
 
-        private Camera activeCamera;
-        private RuntimeCameraController controller;
-        private GameObject ownedCameraObject;
+        private CameraFollowConfiguration _followConfiguration;
+        private Camera _activeCamera;
+        private RuntimeCameraController _controller;
+        private GameObject _ownedCameraObject;
 
-        public RuntimeCameraService(IPlayerSpawnService playerSpawnService, ILogService logger)
+        public RuntimeCameraService(
+            IPlayerSpawnService playerSpawnService,
+            CameraFollowConfiguration followConfiguration,
+            ILogService logger)
         {
-            this.playerSpawnService = playerSpawnService ?? throw new ArgumentNullException(nameof(playerSpawnService));
-            this.logger = logger;
+            _playerSpawnService = playerSpawnService ?? throw new ArgumentNullException(nameof(playerSpawnService));
+            _followConfiguration = followConfiguration;
+            _logger = logger;
         }
 
         public Camera ActiveCamera
         {
-            get { return activeCamera; }
+            get { return _activeCamera; }
         }
 
         public Transform FollowTarget
         {
-            get { return controller != null ? controller.FollowTarget : null; }
+            get { return _controller != null ? _controller.FollowTarget : null; }
         }
 
         public bool IsPrepared
         {
-            get { return activeCamera != null && controller != null; }
+            get { return _activeCamera != null && _controller != null; }
         }
 
         public void PrepareForScene(Scene scene)
@@ -179,58 +196,70 @@ namespace Worldforge.Infrastructure.Cameras
                 sceneCamera = CreateFallbackCamera(scene);
             }
 
-            activeCamera = sceneCamera;
-            controller = EnsureController(sceneCamera);
-            controller.SetTargetProvider(ResolveFollowTarget);
+            _activeCamera = sceneCamera;
+            _controller = EnsureController(sceneCamera);
+            _controller.ApplyConfiguration(_followConfiguration);
+            _controller.SetTargetProvider(ResolveFollowTarget);
         }
 
         public void BindToTarget(Transform target)
         {
-            controller?.SetFollowTarget(target);
+            _controller?.SetFollowTarget(target);
         }
 
         public void ClearTarget()
         {
-            controller?.ClearFollowTarget();
+            _controller?.ClearFollowTarget();
+        }
+
+        public void ApplyConfiguration(CameraFollowConfiguration configuration)
+        {
+            if (configuration == null)
+            {
+                return;
+            }
+
+            _followConfiguration = configuration;
+            _controller?.ApplyConfiguration(_followConfiguration);
         }
 
         public void Dispose()
         {
             ClearTarget();
 
-            if (ownedCameraObject != null)
+            if (_ownedCameraObject != null)
             {
-                DestroyObject(ownedCameraObject);
+                DestroyObject(_ownedCameraObject);
             }
 
-            ownedCameraObject = null;
-            activeCamera = null;
-            controller = null;
+            _ownedCameraObject = null;
+            _activeCamera = null;
+            _controller = null;
         }
 
         private Transform ResolveFollowTarget()
         {
-            return playerSpawnService.ActivePlayer != null
-                ? playerSpawnService.ActivePlayer.transform
+            return _playerSpawnService.ActivePlayer != null
+                ? _playerSpawnService.ActivePlayer.transform
                 : null;
         }
 
         private void ReleaseOwnedCameraIfNeeded(Scene targetScene)
         {
-            if (ownedCameraObject == null)
+            if (_ownedCameraObject == null)
             {
                 return;
             }
 
-            if (ownedCameraObject.scene == targetScene)
+            if (_ownedCameraObject.scene == targetScene)
             {
                 return;
             }
 
-            DestroyObject(ownedCameraObject);
-            ownedCameraObject = null;
-            activeCamera = null;
-            controller = null;
+            DestroyObject(_ownedCameraObject);
+            _ownedCameraObject = null;
+            _activeCamera = null;
+            _controller = null;
         }
 
         private static Camera FindSceneCamera(Scene scene)
@@ -263,22 +292,22 @@ namespace Worldforge.Infrastructure.Cameras
 
         private Camera CreateFallbackCamera(Scene scene)
         {
-            ownedCameraObject = new GameObject("Worldforge.RuntimeCamera");
-            SceneManager.MoveGameObjectToScene(ownedCameraObject, scene);
+            _ownedCameraObject = new GameObject("Worldforge.RuntimeCamera");
+            SceneManager.MoveGameObjectToScene(_ownedCameraObject, scene);
 
-            activeCamera = ownedCameraObject.AddComponent<Camera>();
-            ownedCameraObject.AddComponent<AudioListener>();
-            ownedCameraObject.tag = "MainCamera";
+            _activeCamera = _ownedCameraObject.AddComponent<Camera>();
+            _ownedCameraObject.AddComponent<AudioListener>();
+            _ownedCameraObject.tag = "MainCamera";
 
-            activeCamera.nearClipPlane = 0.03f;
-            activeCamera.farClipPlane = 1000f;
-            activeCamera.fieldOfView = 60f;
+            _activeCamera.nearClipPlane = 0.03f;
+            _activeCamera.farClipPlane = 1000f;
+            _activeCamera.fieldOfView = 60f;
 
-            logger?.Warning(
+            _logger?.Warning(
                 "Infrastructure.Camera",
                 $"Scene '{scene.path}' does not define a camera. Created a runtime fallback camera.");
 
-            return activeCamera;
+            return _activeCamera;
         }
 
         private static RuntimeCameraController EnsureController(Camera sceneCamera)
