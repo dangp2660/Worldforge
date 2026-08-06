@@ -226,7 +226,7 @@ namespace Worldforge.Core.Services
             switch (entry.Level)
             {
                 case LogLevel.Warning:
-                    Debug.LogWarning(formattedMessage);
+                    Debug.LogWarning(formattedMessage); 
                     break;
                 case LogLevel.Error:
                     Debug.LogError(formattedMessage);

@@ -57,6 +57,10 @@ namespace Worldforge.Infrastructure.Cameras
             Vector3 currentPosition,
             Quaternion currentRotation,
             Transform targetTransform,
+            Transform secondaryTransform,
+            CameraMode mode,
+            Vector3 targetOffset,
+            Vector3 impulseOffset,
             CameraInputResult inputDelta,
             CameraFollowConfiguration configuration,
             float deltaTime,
@@ -67,9 +71,24 @@ namespace Worldforge.Infrastructure.Cameras
                 return (currentPosition, currentRotation);
             }
 
-            var focusPoint = targetTransform.position + configuration.LookAtOffset;
+            var focusPoint = targetTransform.position + configuration.LookAtOffset + targetOffset;
 
-            _yaw = Mathf.Repeat(_yaw + inputDelta.YawDelta, 360f);
+            if (mode == CameraMode.TargetLock && secondaryTransform != null)
+            {
+                var midpoint = (targetTransform.position + secondaryTransform.position) * 0.5f;
+                focusPoint = midpoint + configuration.LookAtOffset + targetOffset;
+
+                var lockDirection = (secondaryTransform.position - targetTransform.position);
+                if (lockDirection.sqrMagnitude > 0.001f)
+                {
+                    var targetYaw = Mathf.Atan2(lockDirection.x, lockDirection.z) * Mathf.Rad2Deg;
+                    _yaw = Mathf.LerpAngle(_yaw, targetYaw, Mathf.Max(0.001f, deltaTime * 8f));
+                }
+            }
+            else
+            {
+                _yaw = Mathf.Repeat(_yaw + inputDelta.YawDelta, 360f);
+            }
 
             _targetDistance = Mathf.Clamp(
                 _targetDistance - inputDelta.ZoomDelta,
@@ -111,7 +130,7 @@ namespace Worldforge.Infrastructure.Cameras
                 _distanceVelocity = 0f;
 
                 var snapRotation = Quaternion.Euler(_pitch, _yaw, 0f);
-                var snapPosition = focusPoint - (snapRotation * Vector3.forward * _currentDistance);
+                var snapPosition = focusPoint - (snapRotation * Vector3.forward * _currentDistance) + impulseOffset;
                 return (snapPosition, snapRotation);
             }
 
@@ -134,7 +153,7 @@ namespace Worldforge.Infrastructure.Cameras
                 ref _positionVelocity,
                 positionSmoothTime,
                 float.PositiveInfinity,
-                dt);
+                dt) + impulseOffset;
 
             var rotationLerpSpeed = Mathf.Max(0f, configuration.RotationLerpSpeed);
             var smoothedRotation = Quaternion.Slerp(

@@ -10,6 +10,10 @@ namespace Worldforge.Character.Spawning
         private GameObject activePlayer;
         private string _selectedSpawnId;
 
+        public event Action<GameObject> PlayerSpawned;
+
+        public event Action<GameObject> PlayerDespawning;
+
         public RuntimePlayerSpawnService(Func<GameObject> playerFactory, string defaultSpawnId = null)
         {
             this.playerFactory = playerFactory ?? throw new ArgumentNullException(nameof(playerFactory));
@@ -51,6 +55,7 @@ namespace Worldforge.Character.Spawning
                 request.SpawnLocation.Rotation);
 
             activePlayer = player;
+            PlayerSpawned?.Invoke(activePlayer);
             return activePlayer;
         }
 
@@ -80,7 +85,10 @@ namespace Worldforge.Character.Spawning
                 return;
             }
 
-            UnityEngine.Object.Destroy(activePlayer);
+            var despawningPlayer = activePlayer;
+            PlayerDespawning?.Invoke(despawningPlayer);
+
+            UnityEngine.Object.Destroy(despawningPlayer);
             activePlayer = null;
         }
 

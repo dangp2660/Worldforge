@@ -164,6 +164,14 @@ namespace Worldforge.Infrastructure.Cameras
             _playerSpawnService = playerSpawnService ?? throw new ArgumentNullException(nameof(playerSpawnService));
             _followConfiguration = followConfiguration;
             _logger = logger;
+
+            _playerSpawnService.PlayerSpawned += OnPlayerSpawned;
+            _playerSpawnService.PlayerDespawning += OnPlayerDespawning;
+
+            if (_playerSpawnService.HasActivePlayer)
+            {
+                OnPlayerSpawned(_playerSpawnService.ActivePlayer);
+            }
         }
 
         public Camera ActiveCamera
@@ -174,6 +182,31 @@ namespace Worldforge.Infrastructure.Cameras
         public Transform FollowTarget
         {
             get { return _controller != null ? _controller.FollowTarget : null; }
+        }
+
+        public Transform SecondaryTarget
+        {
+            get { return _controller != null ? _controller.SecondaryTarget : null; }
+        }
+
+        public CameraMode CurrentMode
+        {
+            get { return _controller != null ? _controller.CurrentMode : CameraMode.ThirdPersonFollow; }
+        }
+
+        public Vector3 TargetOffset
+        {
+            get { return _controller != null ? _controller.TargetOffset : Vector3.zero; }
+        }
+
+        public Vector3 CameraForward
+        {
+            get { return _controller != null ? _controller.CameraForward : Vector3.forward; }
+        }
+
+        public Vector3 CameraRight
+        {
+            get { return _controller != null ? _controller.CameraRight : Vector3.right; }
         }
 
         public bool IsPrepared
@@ -201,6 +234,11 @@ namespace Worldforge.Infrastructure.Cameras
             _controller.SetLogger(_logger);
             _controller.ApplyConfiguration(_followConfiguration);
             _controller.SetTargetProvider(ResolveFollowTarget);
+
+            if (_playerSpawnService.HasActivePlayer)
+            {
+                BindToTarget(_playerSpawnService.ActivePlayer.transform);
+            }
         }
 
         public void BindToTarget(Transform target)
@@ -211,6 +249,48 @@ namespace Worldforge.Infrastructure.Cameras
         public void ClearTarget()
         {
             _controller?.ClearFollowTarget();
+        }
+
+        public void SetMode(CameraMode mode, Transform secondaryTarget = null)
+        {
+            _controller?.SetMode(mode, secondaryTarget);
+        }
+
+        public void SetTargetOffset(Vector3 offset)
+        {
+            _controller?.SetTargetOffset(offset);
+        }
+
+        public void ResetTargetOffset()
+        {
+            _controller?.ResetTargetOffset();
+        }
+
+        public void AddImpulse(Vector3 impulse, float duration)
+        {
+            _controller?.AddImpulse(impulse, duration);
+        }
+
+        public void AddShake(float intensity, float duration)
+        {
+            _controller?.AddShake(intensity, duration);
+        }
+
+        public void SetFieldOfView(float fieldOfView)
+        {
+            _controller?.SetFieldOfView(fieldOfView);
+        }
+
+        public void ResetFieldOfView()
+        {
+            _controller?.ResetFieldOfView();
+        }
+
+        public Vector3 GetCameraRelativeDirection(Vector2 inputDirection)
+        {
+            return _controller != null
+                ? _controller.GetCameraRelativeDirection(inputDirection)
+                : Vector3.zero;
         }
 
         public void ApplyConfiguration(CameraFollowConfiguration configuration)
@@ -246,6 +326,12 @@ namespace Worldforge.Infrastructure.Cameras
 
         public void Dispose()
         {
+            if (_playerSpawnService != null)
+            {
+                _playerSpawnService.PlayerSpawned -= OnPlayerSpawned;
+                _playerSpawnService.PlayerDespawning -= OnPlayerDespawning;
+            }
+
             ClearTarget();
 
             if (_ownedCameraObject != null)
@@ -256,6 +342,29 @@ namespace Worldforge.Infrastructure.Cameras
             _ownedCameraObject = null;
             _activeCamera = null;
             _controller = null;
+        }
+
+        private void OnPlayerSpawned(GameObject player)
+        {
+            if (player == null)
+            {
+                return;
+            }
+
+            BindToTarget(player.transform);
+
+            _logger?.Info(
+                "Infrastructure.Camera",
+                $"Camera system bound target to newly spawned player '{player.name}'.");
+        }
+
+        private void OnPlayerDespawning(GameObject player)
+        {
+            ClearTarget();
+
+            _logger?.Info(
+                "Infrastructure.Camera",
+                "Camera system cleared target due to player despawning.");
         }
 
         private Transform ResolveFollowTarget()

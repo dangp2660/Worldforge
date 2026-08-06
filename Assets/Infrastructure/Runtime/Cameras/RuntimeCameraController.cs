@@ -10,14 +10,20 @@ namespace Worldforge.Infrastructure.Cameras
     {
         private readonly CameraInputProcessor _inputProcessor = new();
         private readonly CameraMovementProcessor _movementProcessor = new();
+        private readonly CameraImpulseProcessor _impulseProcessor = new();
 
         private CameraFollowConfiguration _configuration;
         private Func<Transform> _targetProvider;
         private Transform _followTarget;
+        private Transform _secondaryTarget;
+        private Vector3 _targetOffset;
+        private CameraMode _currentMode = CameraMode.ThirdPersonFollow;
         private ILogService _logger;
+        private Camera _attachedCamera;
 
         private InputAction _lookAction;
         private bool _hasAppliedInitialPose;
+        private float _defaultFieldOfView = 60f;
 
         private bool _wasOrbiting;
         private bool _wasZooming;
@@ -26,6 +32,21 @@ namespace Worldforge.Infrastructure.Cameras
         public Transform FollowTarget
         {
             get { return _followTarget; }
+        }
+
+        public Transform SecondaryTarget
+        {
+            get { return _secondaryTarget; }
+        }
+
+        public CameraMode CurrentMode
+        {
+            get { return _currentMode; }
+        }
+
+        public Vector3 TargetOffset
+        {
+            get { return _targetOffset; }
         }
 
         public CameraFollowConfiguration Configuration
@@ -43,6 +64,11 @@ namespace Worldforge.Infrastructure.Cameras
             get { return _movementProcessor; }
         }
 
+        public CameraImpulseProcessor ImpulseProcessor
+        {
+            get { return _impulseProcessor; }
+        }
+
         public float Pitch
         {
             get { return _movementProcessor.Pitch; }
@@ -56,6 +82,35 @@ namespace Worldforge.Infrastructure.Cameras
         public float CurrentDistance
         {
             get { return _movementProcessor.CurrentDistance; }
+        }
+
+        public Vector3 CameraForward
+        {
+            get
+            {
+                var forward = transform.forward;
+                forward.y = 0f;
+                return forward.sqrMagnitude > 0.001f ? forward.normalized : Vector3.forward;
+            }
+        }
+
+        public Vector3 CameraRight
+        {
+            get
+            {
+                var right = transform.right;
+                right.y = 0f;
+                return right.sqrMagnitude > 0.001f ? right.normalized : Vector3.right;
+            }
+        }
+
+        private void Awake()
+        {
+            _attachedCamera = GetComponent<Camera>();
+            if (_attachedCamera != null)
+            {
+                _defaultFieldOfView = _attachedCamera.fieldOfView;
+            }
         }
 
         private void OnEnable()
@@ -134,9 +189,72 @@ namespace Worldforge.Infrastructure.Cameras
         {
             _targetProvider = null;
             _followTarget = null;
+            _secondaryTarget = null;
             _movementProcessor.ResetVelocity();
+            _impulseProcessor.Reset();
             _hasAppliedInitialPose = false;
             SetCursorLock(false);
+        }
+
+        public void SetMode(CameraMode mode, Transform secondaryTarget = null)
+        {
+            _currentMode = mode;
+            _secondaryTarget = secondaryTarget;
+
+            _logger?.Info(
+                "Infrastructure.Camera",
+                $"Camera mode set to '{_currentMode}' with secondary target '{(_secondaryTarget != null ? _secondaryTarget.name : "None")}'.");
+        }
+
+        public void SetTargetOffset(Vector3 offset)
+        {
+            _targetOffset = offset;
+        }
+
+        public void ResetTargetOffset()
+        {
+            _targetOffset = Vector3.zero;
+        }
+
+        public void AddImpulse(Vector3 impulse, float duration)
+        {
+            _impulseProcessor.AddImpulse(impulse, duration);
+        }
+
+        public void AddShake(float intensity, float duration)
+        {
+            _impulseProcessor.AddShake(intensity, duration);
+        }
+
+        public void SetFieldOfView(float fieldOfView)
+        {
+            if (_attachedCamera != null)
+            {
+                _attachedCamera.fieldOfView = Mathf.Clamp(fieldOfView, 10f, 160f);
+            }
+        }
+
+        public void ResetFieldOfView()
+        {
+            if (_attachedCamera != null)
+            {
+                _attachedCamera.fieldOfView = _defaultFieldOfView;
+            }
+        }
+
+        public Vector3 GetCameraRelativeDirection(Vector2 inputDirection)
+        {
+            if (inputDirection.sqrMagnitude < 0.0001f)
+            {
+                return Vector3.zero;
+            }
+
+            var forward = CameraForward;
+            var right = CameraRight;
+
+            var relativeDir = right * inputDirection.x + forward * inputDirection.y;
+            relativeDir.y = 0f;
+            return relativeDir.sqrMagnitude > 0.0001f ? relativeDir.normalized : Vector3.zero;
         }
 
         public void SetOrbitAngles(float pitch, float yaw)
@@ -183,10 +301,16 @@ namespace Worldforge.Infrastructure.Cameras
                 && _configuration.SnapOnTargetAcquire
                 && !_hasAppliedInitialPose;
 
+            var impulseOffset = _impulseProcessor.Evaluate(Time.deltaTime);
+
             var (newPosition, newRotation) = _movementProcessor.CalculatePose(
                 transform.position,
                 transform.rotation,
                 _followTarget,
+                _secondaryTarget,
+                _currentMode,
+                _targetOffset,
+                impulseOffset,
                 inputResult,
                 _configuration,
                 Time.deltaTime,
