@@ -2,7 +2,8 @@
   "name": "Character",
   "rootNamespace": "Worldforge.Character",
   "references": [
-    "Core"
+    "Core",
+    "Unity.InputSystem"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],
