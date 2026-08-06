@@ -198,6 +198,7 @@ namespace Worldforge.Infrastructure.Cameras
 
             _activeCamera = sceneCamera;
             _controller = EnsureController(sceneCamera);
+            _controller.SetLogger(_logger);
             _controller.ApplyConfiguration(_followConfiguration);
             _controller.SetTargetProvider(ResolveFollowTarget);
         }
@@ -221,6 +222,26 @@ namespace Worldforge.Infrastructure.Cameras
 
             _followConfiguration = configuration;
             _controller?.ApplyConfiguration(_followConfiguration);
+        }
+
+        public void SetOrbitAngles(float pitch, float yaw)
+        {
+            _controller?.SetOrbitAngles(pitch, yaw);
+        }
+
+        public void SetZoomDistance(float distance)
+        {
+            _controller?.SetZoomDistance(distance);
+        }
+
+        public void ResetPose()
+        {
+            _controller?.ResetPose();
+        }
+
+        public void SetCursorLock(bool isLocked)
+        {
+            RuntimeCameraController.SetCursorLock(isLocked);
         }
 
         public void Dispose()
