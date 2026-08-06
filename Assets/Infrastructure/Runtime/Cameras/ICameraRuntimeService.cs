@@ -18,5 +18,13 @@ namespace Worldforge.Infrastructure.Cameras
         void ClearTarget();
 
         void ApplyConfiguration(CameraFollowConfiguration configuration);
+
+        void SetOrbitAngles(float pitch, float yaw);
+
+        void SetZoomDistance(float distance);
+
+        void ResetPose();
+
+        void SetCursorLock(bool isLocked);
     }
 }

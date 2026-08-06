@@ -12,8 +12,24 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ed1df1cd8ca2328408eb4cbcfb249306, type: 3}
   m_Name: CameraFollowConfiguration
   m_EditorClassIdentifier: Infrastructure::Worldforge.Infrastructure.Cameras.CameraFollowConfiguration
-  _followOffset: {x: 0, y: 8, z: -6}
-  _lookAtOffset: {x: 0, y: 1.5, z: 0}
-  _positionSmoothTime: 0.12
+  _followOffset: {x: 0, y: 7, z: -5}
+  _lookAtOffset: {x: 0, y: 1.6, z: 0}
+  _minDistance: 11
+  _maxDistance: 17
+  _defaultDistance: 13
+  _minPitchAngle: 45
+  _maxPitchAngle: 55
+  _mouseSensitivityX: 0.2
+  _mouseSensitivityY: 0.2
+  _zoomSensitivity: 2
+  _inputDeadZone: 0.01
+  _invertPitch: 0
+  _invertYaw: 0
+  _positionSmoothTime: 0.1
+  _rotationSmoothTime: 0.08
   _rotationLerpSpeed: 12
+  _zoomSmoothTime: 0.15
   _snapOnTargetAcquire: 1
+  _requireRightMouseToRotate: 1
+  _enablePitchZoomCoupling: 1
+  _lockCursor: 0
