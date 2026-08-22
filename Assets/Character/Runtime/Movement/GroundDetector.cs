@@ -4,7 +4,7 @@ namespace Worldforge.Character.Movement
 {
     public sealed class GroundDetector
     {
-        private static readonly RaycastHit[] HitBuffer = new RaycastHit[4];
+        private static readonly RaycastHit[] HitBuffer = new RaycastHit[16];
 
         public GroundCheckResult Detect(
             Vector3 position,
@@ -12,8 +12,9 @@ namespace Worldforge.Character.Movement
             float distance,
             LayerMask groundLayers)
         {
-            var origin = position + Vector3.up * radius;
-            var castDistance = distance + radius;
+            const float verticalOffset = 0.15f;
+            var origin = position + Vector3.up * (radius + verticalOffset);
+            var castDistance = distance + radius + verticalOffset + 0.1f;
 
             var hitCount = Physics.SphereCastNonAlloc(
                 origin,
@@ -24,16 +25,17 @@ namespace Worldforge.Character.Movement
                 groundLayers,
                 QueryTriggerInteraction.Ignore);
 
-            if (hitCount == 0)
-            {
-                return GroundCheckResult.NotGrounded;
-            }
-
-            var closestIndex = 0;
+            var closestIndex = -1;
             var closestDistance = float.MaxValue;
 
             for (var i = 0; i < hitCount; i++)
             {
+                var hitCollider = HitBuffer[i].collider;
+                if (hitCollider == null || IsPlayerCollider(hitCollider))
+                {
+                    continue;
+                }
+
                 if (HitBuffer[i].distance < closestDistance)
                 {
                     closestDistance = HitBuffer[i].distance;
@@ -41,15 +43,72 @@ namespace Worldforge.Character.Movement
                 }
             }
 
-            var hit = HitBuffer[closestIndex];
-            var slopeAngle = Vector3.Angle(hit.normal, Vector3.up);
+            if (closestIndex >= 0)
+            {
+                var hit = HitBuffer[closestIndex];
+                var slopeAngle = Vector3.Angle(hit.normal, Vector3.up);
 
-            return new GroundCheckResult(
-                true,
-                hit.point,
-                hit.normal,
-                slopeAngle,
-                hit.distance);
+                return new GroundCheckResult(
+                    true,
+                    hit.point,
+                    hit.normal,
+                    slopeAngle,
+                    hit.distance,
+                    hit.collider);
+            }
+
+            // Raycast fallback
+            var rayHitCount = Physics.RaycastNonAlloc(
+                position + Vector3.up * 0.3f,
+                Vector3.down,
+                HitBuffer,
+                distance + 0.6f,
+                groundLayers,
+                QueryTriggerInteraction.Ignore);
+
+            for (var i = 0; i < rayHitCount; i++)
+            {
+                var hitCollider = HitBuffer[i].collider;
+                if (hitCollider == null || IsPlayerCollider(hitCollider))
+                {
+                    continue;
+                }
+
+                var hit = HitBuffer[i];
+                var slopeAngle = Vector3.Angle(hit.normal, Vector3.up);
+
+                return new GroundCheckResult(
+                    true,
+                    hit.point,
+                    hit.normal,
+                    slopeAngle,
+                    hit.distance,
+                    hit.collider);
+            }
+
+            return GroundCheckResult.NotGrounded;
+        }
+
+        private static bool IsPlayerCollider(Collider col)
+        {
+            if (col is CharacterController)
+            {
+                return true;
+            }
+
+            if (col.GetComponentInParent<CharacterMovementController>() != null)
+            {
+                return true;
+            }
+
+            if (col.GetComponentInParent<Player.PlayerAvatar>() != null)
+            {
+                return true;
+            }
+
+            return false;
         }
     }
 }
+
+

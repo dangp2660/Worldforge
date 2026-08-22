@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using Worldforge.Character.Traversal;
 using Worldforge.Core.Services;
 
 namespace Worldforge.Character.Movement
@@ -9,6 +10,7 @@ namespace Worldforge.Character.Movement
     {
         private CharacterMotor _motor;
         private CharacterController _characterController;
+        private TraversalConfiguration _traversalConfiguration;
         private ILogService _logger;
 
         private InputAction _moveAction;
@@ -21,6 +23,7 @@ namespace Worldforge.Character.Movement
         private bool _wasGrounded;
         private bool _wasSprinting;
         private bool _wasMoving;
+        private SurfaceType _wasSurfaceType = SurfaceType.Default;
 
         public bool IsGrounded
         {
@@ -37,7 +40,20 @@ namespace Worldforge.Character.Movement
             get { return _motor != null ? _motor.CurrentVelocity : Vector3.zero; }
         }
 
-        public void Initialize(CharacterMovementConfiguration configuration, ILogService logger)
+        public TraversalCheckResult LastTraversalResult
+        {
+            get { return _motor != null ? _motor.LastTraversalResult : TraversalCheckResult.DefaultAllowed; }
+        }
+
+        public bool HasTraversalSystem
+        {
+            get { return _motor != null && _motor.HasTraversalSystem; }
+        }
+
+        public void Initialize(
+            CharacterMovementConfiguration configuration,
+            ILogService logger,
+            TraversalConfiguration traversalConfiguration = null)
         {
             _logger = logger;
 
@@ -46,6 +62,15 @@ namespace Worldforge.Character.Movement
             if (_characterController == null)
             {
                 _characterController = gameObject.AddComponent<CharacterController>();
+            }
+
+            var extraColliders = GetComponents<Collider>();
+            for (var i = 0; i < extraColliders.Length; i++)
+            {
+                if (!(extraColliders[i] is CharacterController))
+                {
+                    extraColliders[i].enabled = false;
+                }
             }
 
             var inputProcessor = new MovementInputProcessor(configuration.InputDeadZone);
@@ -58,6 +83,29 @@ namespace Worldforge.Character.Movement
 
             _motor = new CharacterMotor(inputProcessor, groundDetector, gravityProcessor, slopeHandler);
             _motor.ApplyConfiguration(configuration);
+
+            _traversalConfiguration = traversalConfiguration ?? Resources.Load<TraversalConfiguration>("TraversalConfiguration");
+
+            if (_traversalConfiguration != null)
+            {
+                var traversalEvaluator = new TraversalEvaluator(_traversalConfiguration);
+                var surfaceDetector = new SurfaceDetector();
+                _motor.SetTraversalSystem(traversalEvaluator, surfaceDetector);
+
+                _logger?.Info(
+                    "Gameplay.CharacterMovement",
+                    $"Traversal system initialized for '{gameObject.name}'.");
+
+                Debug.Log(
+                    $"<color=#55FF55><b>[Worldforge Traversal]</b></color> Traversal system ACTIVE on '{gameObject.name}'. " +
+                    $"Rules: {_traversalConfiguration.SurfaceRules?.Length ?? 0}, MaxSlope: {_traversalConfiguration.DefaultMaxSlopeAngle}°");
+            }
+            else
+            {
+                Debug.LogWarning(
+                    $"<color=#FFAA55><b>[Worldforge Traversal]</b></color> Traversal configuration is NULL on '{gameObject.name}'. " +
+                    "Traversal system is disabled.");
+            }
 
             _rotationSpeed = configuration.RotationSpeed;
             _groundCheckRadius = configuration.GroundCheckRadius;
@@ -93,6 +141,8 @@ namespace Worldforge.Character.Movement
             _logger = null;
         }
 
+        private Collider _lastControllerHitCollider;
+
         private void Update()
         {
             if (!_isInitialized || _motor == null || _characterController == null)
@@ -108,15 +158,17 @@ namespace Worldforge.Character.Movement
 
             var cameraTransform = Camera.main != null ? Camera.main.transform : null;
 
+            var feetPosition = transform.position + _characterController.center - Vector3.up * (_characterController.height * 0.5f);
+
             var frameInput = new MovementFrameInput(
                 rawInput,
                 isSprinting,
                 cameraTransform,
-                transform.position,
+                feetPosition,
                 _groundCheckRadius,
                 Time.deltaTime);
 
-            var displacement = _motor.CalculateMovement(frameInput);
+            var displacement = _motor.CalculateMovement(frameInput, _lastControllerHitCollider);
 
             _characterController.Move(displacement);
 
@@ -125,47 +177,56 @@ namespace Worldforge.Character.Movement
             LogMovementInfo(rawInput, displacement, isSprinting);
         }
 
-        private void LogMovementInfo(Vector2 rawInput, Vector3 displacement, bool currentIsSprinting)
+        private void OnControllerColliderHit(ControllerColliderHit hit)
         {
-            if (_logger == null)
+            if (hit.collider == null)
             {
                 return;
             }
 
-            var currentIsGrounded = IsGrounded;
+            _lastControllerHitCollider = hit.collider;
+        }
+
+        private void LogMovementInfo(Vector2 rawInput, Vector3 displacement, bool currentIsSprinting)
+        {
             var currentVelocity = CurrentVelocity;
-            var horizontalSpeedSqr = currentVelocity.x * currentVelocity.x + currentVelocity.z * currentVelocity.z;
-            var isMoving = rawInput.sqrMagnitude > 0.01f || horizontalSpeedSqr > 0.001f;
+            var horizontalSpeed = new Vector2(currentVelocity.x, currentVelocity.z).magnitude;
+            var isMoving = rawInput.sqrMagnitude > 0.01f || horizontalSpeed > 0.01f;
 
-            var groundedChanged = currentIsGrounded != _wasGrounded;
-            var sprintChanged = currentIsSprinting != _wasSprinting;
+            var traversalResult = LastTraversalResult;
+            var currentSurface = traversalResult.SurfaceType;
+            var surfaceChanged = currentSurface != _wasSurfaceType;
             var moveStateChanged = isMoving != _wasMoving;
+            var sprintChanged = currentIsSprinting != _wasSprinting;
 
-            if (groundedChanged || sprintChanged || moveStateChanged)
+            if (surfaceChanged || moveStateChanged || (isMoving && sprintChanged))
             {
-                var currentSpeed = currentVelocity.magnitude;
-                string eventReason;
+                var displaySpeed = isMoving ? horizontalSpeed : 0f;
+                string status;
 
-                if (moveStateChanged)
+                if (!traversalResult.IsTraversable)
                 {
-                    eventReason = isMoving ? "Start Moving" : "Stop Moving";
+                    status = $"Blocked ({currentSurface})";
+                    displaySpeed = 0f;
                 }
-                else if (groundedChanged)
+                else if (isMoving)
                 {
-                    eventReason = currentIsGrounded ? "Landed" : "Airborne";
+                    status = currentIsSprinting ? "Sprinting" : "Moving";
                 }
                 else
                 {
-                    eventReason = currentIsSprinting ? "Sprint Start" : "Sprint Stop";
+                    status = "Idle";
                 }
 
-                _logger.Info(
-                    "Gameplay.CharacterMovement",
-                    $"[{eventReason}] Vel: {currentVelocity} | Speed: {currentSpeed:F2} m/s | Grounded: {currentIsGrounded} | Sprinting: {currentIsSprinting} | Displacement: {displacement}");
+                var logMessage = $"[Movement] {status} | Surface: {currentSurface} | Speed: {displaySpeed:F2} m/s (x{traversalResult.EffectiveSpeedMultiplier:F2})";
 
-                _wasGrounded = currentIsGrounded;
-                _wasSprinting = currentIsSprinting;
+                _logger?.Info("Gameplay.CharacterMovement", logMessage);
+                Debug.Log(logMessage);
+
                 _wasMoving = isMoving;
+                _wasSprinting = currentIsSprinting;
+                _wasSurfaceType = currentSurface;
+                _wasGrounded = IsGrounded;
             }
         }
 

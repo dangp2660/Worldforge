@@ -1,4 +1,5 @@
 using UnityEngine;
+using Worldforge.Character.Traversal;
 
 namespace Worldforge.Character.Movement
 {
@@ -12,8 +13,14 @@ namespace Worldforge.Character.Movement
 
         Vector3 CurrentVelocity { get; }
 
+        /// <summary>
+        /// Returns the traversal service if available, or null if traversal is not configured.
+        /// </summary>
+        ITraversalService Traversal { get; }
+
         void AttachToPlayer(GameObject playerObject);
 
         void DetachFromPlayer();
     }
 }
+

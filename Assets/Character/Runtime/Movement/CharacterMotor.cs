@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using Worldforge.Character.Traversal;
 
 namespace Worldforge.Character.Movement
 {
@@ -10,6 +11,9 @@ namespace Worldforge.Character.Movement
         private readonly GravityProcessor _gravityProcessor;
         private readonly SlopeHandler _slopeHandler;
 
+        private TraversalEvaluator _traversalEvaluator;
+        private SurfaceDetector _surfaceDetector;
+
         private float _walkSpeed;
         private float _sprintSpeed;
         private float _maxSlopeAngle;
@@ -19,6 +23,7 @@ namespace Worldforge.Character.Movement
         private Vector3 _currentVelocity;
         private bool _isGrounded;
         private GroundCheckResult _lastGroundResult;
+        private TraversalCheckResult _lastTraversalResult;
 
         public CharacterMotor(
             MovementInputProcessor inputProcessor,
@@ -30,6 +35,7 @@ namespace Worldforge.Character.Movement
             _groundDetector = groundDetector ?? throw new ArgumentNullException(nameof(groundDetector));
             _gravityProcessor = gravityProcessor ?? throw new ArgumentNullException(nameof(gravityProcessor));
             _slopeHandler = slopeHandler ?? throw new ArgumentNullException(nameof(slopeHandler));
+            _lastTraversalResult = TraversalCheckResult.DefaultAllowed;
         }
 
         public Vector3 CurrentVelocity
@@ -45,6 +51,16 @@ namespace Worldforge.Character.Movement
         public GroundCheckResult LastGroundResult
         {
             get { return _lastGroundResult; }
+        }
+
+        public TraversalCheckResult LastTraversalResult
+        {
+            get { return _lastTraversalResult; }
+        }
+
+        public bool HasTraversalSystem
+        {
+            get { return _traversalEvaluator != null; }
         }
 
         public float WalkSpeed
@@ -77,13 +93,21 @@ namespace Worldforge.Character.Movement
             set { _groundLayers = value; }
         }
 
-        public Vector3 CalculateMovement(MovementFrameInput frameInput)
+        public void SetTraversalSystem(TraversalEvaluator evaluator, SurfaceDetector surfaceDetector)
         {
+            _traversalEvaluator = evaluator;
+            _surfaceDetector = surfaceDetector;
+        }
+
+        public Vector3 CalculateMovement(MovementFrameInput frameInput, Collider directContactCollider = null)
+        {
+            var effectiveGroundLayers = _groundLayers.value != 0 ? _groundLayers : (LayerMask)(~0);
+
             _lastGroundResult = _groundDetector.Detect(
                 frameInput.CharacterPosition,
                 frameInput.CharacterRadius,
                 _groundCheckDistance,
-                _groundLayers);
+                effectiveGroundLayers);
 
             _isGrounded = _lastGroundResult.IsGrounded
                 && _lastGroundResult.SlopeAngle <= _maxSlopeAngle;
@@ -93,6 +117,51 @@ namespace Worldforge.Character.Movement
                 frameInput.CameraTransform);
 
             var speed = frameInput.IsSprinting ? _sprintSpeed : _walkSpeed;
+
+            if (_traversalEvaluator != null && _surfaceDetector != null)
+            {
+                var surfaceType = _surfaceDetector.Detect(
+                    _lastGroundResult,
+                    frameInput.CharacterPosition,
+                    effectiveGroundLayers,
+                    directContactCollider);
+
+                var intendedMovement = worldDirection * speed;
+
+                _lastTraversalResult = _traversalEvaluator.Evaluate(
+                    _lastGroundResult,
+                    intendedMovement,
+                    surfaceType);
+
+                if (!_lastTraversalResult.IsTraversable)
+                {
+                    if (_lastTraversalResult.DenialReason == TraversalDenialReason.NonTraversableSurface)
+                    {
+                        worldDirection = Vector3.zero;
+                        speed = 0f;
+                    }
+                    else if (_lastTraversalResult.DenialReason == TraversalDenialReason.TooSteep)
+                    {
+                        var slopeNormal = _lastGroundResult.HitNormal;
+                        var horizontalNormal = new Vector3(slopeNormal.x, 0f, slopeNormal.z).normalized;
+                        if (Vector3.Dot(worldDirection, -horizontalNormal) > 0f)
+                        {
+                            worldDirection = Vector3.ProjectOnPlane(worldDirection, horizontalNormal).normalized;
+                        }
+                    }
+
+                    _isGrounded = _lastGroundResult.IsGrounded;
+                }
+                else
+                {
+                    speed *= _lastTraversalResult.EffectiveSpeedMultiplier;
+                }
+            }
+            else
+            {
+                _lastTraversalResult = TraversalCheckResult.DefaultAllowed;
+            }
+
             var horizontalMovement = worldDirection * speed;
 
             var verticalVelocity = _gravityProcessor.Update(_isGrounded, frameInput.DeltaTime);
@@ -133,7 +202,9 @@ namespace Worldforge.Character.Movement
             _currentVelocity = Vector3.zero;
             _isGrounded = false;
             _lastGroundResult = GroundCheckResult.NotGrounded;
+            _lastTraversalResult = TraversalCheckResult.DefaultAllowed;
             _gravityProcessor.Reset();
         }
     }
 }
+

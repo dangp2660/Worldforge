@@ -558,6 +558,8 @@ GameObject:
   m_Component:
   - component: {fileID: 1501}
   - component: {fileID: 1502}
+  - component: {fileID: 1504}
+  - component: {fileID: 1505}
   m_Layer: 0
   m_Name: Environment Root
   m_TagString: Untagged
@@ -597,6 +599,57 @@ MonoBehaviour:
   floorHeight: 0
   markerScale: {x: 1, y: 2, z: 1}
   markerOffset: 18
+  floorColor: {r: 0.34, g: 0.38, b: 0.45, a: 1}
+  markerColor: {r: 0.2, g: 0.24, b: 0.32, a: 1}
+  floorSmoothness: 0
+  markerSmoothness: 0.05
+  generateOnAwake: 1
+--- !u!114 &1504
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1500}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 24d319e39afd8a44fb38dc9008f15b5e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Infrastructure::Worldforge.Infrastructure.Development.TraversalSurfaceGenerator
+  generateOnAwake: 1
+  environmentRoot: {fileID: 1501}
+  patchSize: 4
+  patchSpacing: 6
+  startOffsetZ: 5
+  rampLength: 8
+  rampAngle: 35
+  grassColor: {r: 0.2, g: 0.6, b: 0.2, a: 1}
+  mudColor: {r: 0.4, g: 0.25, b: 0.1, a: 1}
+  iceColor: {r: 0.6, g: 0.85, b: 0.95, a: 1}
+  lavaColor: {r: 0.9, g: 0.15, b: 0.05, a: 1}
+  sandColor: {r: 0.85, g: 0.75, b: 0.45, a: 1}
+  rampColor: {r: 0.5, g: 0.5, b: 0.55, a: 1}
+--- !u!114 &1505
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1500}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7788b0e1c9a3492f96c313849ad39a5f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Infrastructure::Worldforge.Infrastructure.Development.DevelopmentEnvironmentManager
+  environmentRoot: {fileID: 0}
+  floorScale: {x: 4, y: 1, z: 4}
+  floorHeight: 0
+  markerScale: {x: 1, y: 2, z: 1}
+  markerOffset: 18
+  floorColor: {r: 0.34, g: 0.38, b: 0.45, a: 1}
+  markerColor: {r: 0.2, g: 0.24, b: 0.32, a: 1}
+  floorSmoothness: 0
+  markerSmoothness: 0.05
   generateOnAwake: 1
 --- !u!1 &1600
 GameObject:
@@ -608,7 +661,6 @@ GameObject:
   m_Component:
   - component: {fileID: 1601}
   - component: {fileID: 1603}
-  - component: {fileID: 1602}
   m_Layer: 0
   m_Name: Bootstrap and Test Managers
   m_TagString: Untagged
@@ -631,21 +683,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1001}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1602
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1600}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e3a8f98f8cb34e6cb7f59db98a406c21, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Infrastructure::Worldforge.Infrastructure.Development.GameplaySystemsTestManager
-  primaryInventoryContainerId: dev.inventory.primary
-  secondaryInventoryContainerId: dev.inventory.gathering
-  testGatherNodeId: dev.gathering.node
 --- !u!114 &1603
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -663,6 +700,19 @@ MonoBehaviour:
   eventSystem: {fileID: 1403}
   globalVolumeObject: {fileID: 1300}
   environmentRoot: {fileID: 1501}
+  normalizeDirectionalLightOnStart: 1
+  targetDirectionalLightIntensity: 1.2
+  directionalLightColor: {r: 1, g: 0.95686275, b: 0.9019608, a: 1}
+  directionalShadowStrength: 0.82
+  applyAmbientLightingOnStart: 1
+  ambientSkyColor: {r: 0.32, g: 0.39, b: 0.5, a: 1}
+  ambientEquatorColor: {r: 0.22, g: 0.27, b: 0.34, a: 1}
+  ambientGroundColor: {r: 0.13, g: 0.15, b: 0.18, a: 1}
+  createFillLightOnStart: 1
+  fillLightIntensity: 0.32
+  fillLightColor: {r: 0.48, g: 0.56, b: 0.68, a: 1}
+  fillLightEulerAngles: {x: 28, y: -132, z: 0}
+  autoStartNewGame: 1
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

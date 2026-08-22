@@ -9,13 +9,15 @@ namespace Worldforge.Character.Movement
             Vector3 hitPoint,
             Vector3 hitNormal,
             float slopeAngle,
-            float hitDistance)
+            float hitDistance,
+            Collider hitCollider = null)
         {
             IsGrounded = isGrounded;
             HitPoint = hitPoint;
             HitNormal = hitNormal;
             SlopeAngle = slopeAngle;
             HitDistance = hitDistance;
+            HitCollider = hitCollider;
         }
 
         public bool IsGrounded { get; }
@@ -28,6 +30,8 @@ namespace Worldforge.Character.Movement
 
         public float HitDistance { get; }
 
+        public Collider HitCollider { get; }
+
         public static GroundCheckResult NotGrounded
         {
             get
@@ -37,8 +41,10 @@ namespace Worldforge.Character.Movement
                     Vector3.zero,
                     Vector3.up,
                     0f,
-                    0f);
+                    0f,
+                    null);
             }
         }
     }
 }
+

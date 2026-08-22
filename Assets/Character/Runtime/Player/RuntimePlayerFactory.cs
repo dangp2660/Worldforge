@@ -14,6 +14,15 @@ namespace Worldforge.Character.Player
 
             playerObject.name = PlayerGameObjectName;
 
+            if (prefabObject == null)
+            {
+                var capsuleCollider = playerObject.GetComponent<CapsuleCollider>();
+                if (capsuleCollider != null)
+                {
+                    Object.Destroy(capsuleCollider);
+                }
+            }
+
             if (playerObject.GetComponent<PlayerAvatar>() == null)
             {
                 playerObject.AddComponent<PlayerAvatar>();

@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using Worldforge.Character.Traversal;
 using Worldforge.Core.Services;
 
 namespace Worldforge.Character.Movement
@@ -7,17 +8,21 @@ namespace Worldforge.Character.Movement
     internal sealed class RuntimeCharacterMovementService : ICharacterMovementService, IDisposable
     {
         private readonly CharacterMovementConfiguration _configuration;
+        private readonly TraversalConfiguration _traversalConfiguration;
         private readonly ILogService _logger;
 
         private CharacterMovementController _controller;
         private GameObject _attachedPlayer;
+        private TraversalServiceAdapter _traversalAdapter;
 
         public RuntimeCharacterMovementService(
             CharacterMovementConfiguration configuration,
-            ILogService logger)
+            ILogService logger,
+            TraversalConfiguration traversalConfiguration = null)
         {
             _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
             _logger = logger;
+            _traversalConfiguration = traversalConfiguration;
         }
 
         public bool IsAttached
@@ -38,6 +43,11 @@ namespace Worldforge.Character.Movement
         public Vector3 CurrentVelocity
         {
             get { return _controller != null ? _controller.CurrentVelocity : Vector3.zero; }
+        }
+
+        public ITraversalService Traversal
+        {
+            get { return _traversalAdapter; }
         }
 
         public void AttachToPlayer(GameObject playerObject)
@@ -61,8 +71,13 @@ namespace Worldforge.Character.Movement
                 _controller = playerObject.AddComponent<CharacterMovementController>();
             }
 
-            _controller.Initialize(_configuration, _logger);
+            _controller.Initialize(_configuration, _logger, _traversalConfiguration);
             _attachedPlayer = playerObject;
+
+            if (_controller.HasTraversalSystem)
+            {
+                _traversalAdapter = new TraversalServiceAdapter(_controller);
+            }
 
             _logger?.Info(
                 "Gameplay.CharacterMovement",
@@ -76,6 +91,8 @@ namespace Worldforge.Character.Movement
                 _controller.Shutdown();
                 _controller = null;
             }
+
+            _traversalAdapter = null;
 
             if (_attachedPlayer != null)
             {
@@ -91,5 +108,55 @@ namespace Worldforge.Character.Movement
         {
             DetachFromPlayer();
         }
+
+        /// <summary>
+        /// Adapter that bridges the CharacterMovementController's traversal state
+        /// to the ITraversalService interface for external consumers.
+        /// </summary>
+        private sealed class TraversalServiceAdapter : ITraversalService
+        {
+            private readonly CharacterMovementController _controller;
+
+            public TraversalServiceAdapter(CharacterMovementController controller)
+            {
+                _controller = controller;
+            }
+
+            public bool IsTraversalActive
+            {
+                get { return _controller != null && _controller.HasTraversalSystem; }
+            }
+
+            public TraversalCheckResult LastResult
+            {
+                get
+                {
+                    return _controller != null
+                        ? _controller.LastTraversalResult
+                        : TraversalCheckResult.DefaultAllowed;
+                }
+            }
+
+            public SurfaceType CurrentSurface
+            {
+                get
+                {
+                    return _controller != null
+                        ? _controller.LastTraversalResult.SurfaceType
+                        : SurfaceType.Default;
+                }
+            }
+
+            public float CurrentSpeedMultiplier
+            {
+                get
+                {
+                    return _controller != null
+                        ? _controller.LastTraversalResult.EffectiveSpeedMultiplier
+                        : 1f;
+                }
+            }
+        }
     }
 }
+
