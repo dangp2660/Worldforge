@@ -44,9 +44,9 @@ Ref: BảngA.CộtA > BảngB.CộtB   // BảngA.CộtA là FK trỏ tới Bả
 | Part 3 | Item | `ItemDefinition`, `WeaponComponent`, `ArmorComponent`, `LootTable` |
 | Part 4 | Inventory & Equipment | `InventoryDefinition`, `EquipmentLoadout`, `EquippedItem` |
 | Part 5 | Ability & Crafting | `AbilityDefinition`, `RecipeDefinition` |
-| Part 6 | Building & Settlement | `BuildingDefinition`, `SettlementDefinition` |
-| Part 7 | World & Exploration | `WorldDefinition`, `RegionDefinition`, `BiomeDefinition` |
-| Part 8 | AI, NPC & Faction | `FactionDefinition`, `AIProfile`, `NPCDefinition` |
+| Part 6 | Building & Settlement | `BuildingDefinition`, `SettlementDefinition` (vị trí do người chơi chọn, phòng thủ) |
+| Part 7 | World & Exploration | `WorldDefinition`, `RegionDefinition`, `BiomeDefinition`, `TeleportationWaypointDefinition` |
+| Part 8 | AI, NPC & Faction | `FactionDefinition`, `AIProfile`, `NPCRole`, `NPCDefinition` (phân loại Common NPC vs Key NPC) |
 
 ---
 

@@ -119,6 +119,7 @@ Table NPCDefinition {
   CreatureID varchar
   AIProfileID varchar
   FactionID varchar
+  NPCCategory varchar
 }
 
 Table Faction {
@@ -157,6 +158,12 @@ Table Expedition {
 
 Table Technology {
   TechnologyID varchar [pk]
+}
+
+Table TeleportationWaypoint {
+  WaypointID varchar [pk]
+  RegionID varchar
+  RequiredProgressionID varchar
 }
 
 Table Merchant {
@@ -227,5 +234,6 @@ Ref: Merchant.NPCID > NPCDefinition.NPCID
 Ref: Merchant.CurrencyID > Currency.CurrencyID
 
 Ref: Expedition.RegionID > WorldRegion.RegionID
+Ref: TeleportationWaypoint.RegionID > WorldRegion.RegionID
 
 Ref: SaveProfile.PlayerID > PlayerProfile.PlayerID

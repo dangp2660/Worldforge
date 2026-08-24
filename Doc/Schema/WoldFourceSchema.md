@@ -81,6 +81,8 @@ Table GameConfig {
   TimeScale float
   DayLength float
   NightLength float
+  NightThreatMultiplier float [default: 1.5]
+  ItemDropScatterForce float [default: 5.0]
   TargetFPS int
   FixedTickRate float
   InteractionDistance float
@@ -944,6 +946,10 @@ Table SettlementDefinition {
   MaxBuilding int
 
   TerritoryRadius float
+
+  IsPlayerChoosableLocation bool [default: true]
+
+  BaseDefenseRating float
 }
 
 Table SettlementBuilding {
@@ -1118,6 +1124,29 @@ Table ExplorationReward {
   RewardValue varchar(255)
 }
 
+Table TeleportationWaypointDefinition {
+
+  WaypointId bigint [pk, increment]
+
+  WaypointCode varchar(100) [unique]
+
+  DisplayName varchar(100)
+
+  Description text
+
+  RegionId bigint
+
+  LandmarkId bigint
+
+  RequiredMilestoneId bigint
+
+  IsUnlockedByDefault bool [default: false]
+
+  IsConstructible bool [default: true]
+
+  RequiresActivation bool [default: true]
+}
+
 //////////////////////////////////////////////////////////
 // RELATIONSHIP
 //////////////////////////////////////////////////////////
@@ -1140,6 +1169,10 @@ Ref: SpawnEntry.SpawnGroupId > SpawnGroup.SpawnGroupId
 Ref: SpawnEntry.CreatureId > CharacterDefinition.CharacterDefinitionId
 
 Ref: ExplorationReward.LandmarkId > LandmarkDefinition.LandmarkId
+
+Ref: TeleportationWaypointDefinition.RegionId > RegionDefinition.RegionId
+Ref: TeleportationWaypointDefinition.LandmarkId > LandmarkDefinition.LandmarkId
+Ref: TeleportationWaypointDefinition.RequiredMilestoneId > ProgressionMilestone.MilestoneId
 
 //////////////////////////////////////////////////////////
 // PART 8 - AI, NPC & FACTION MODULE
@@ -1220,6 +1253,8 @@ Table NPCRole {
   DisplayName varchar(100)
 
   Description text
+
+  RoleCategory varchar(50) [default: 'Common']
 }
 
 Table NPCDefinition {
@@ -1229,6 +1264,10 @@ Table NPCDefinition {
   NPCCode varchar(100) [unique]
 
   DisplayName varchar(100)
+
+  NPCCategory varchar(50) [default: 'Common']
+
+  IsKeyNPC bool [default: false]
 
   CharacterDefinitionId bigint
 
