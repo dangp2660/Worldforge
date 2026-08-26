@@ -16,7 +16,7 @@ MonoBehaviour:
   _displayName: Oak Tree
   _description: A mature oak tree rich in sturdy wood.
   _biomeType: Forest
-  _primaryYield: {fileID: 11400000, guid: a1000000000000000000000000000001, type: 3}
+  _primaryYield: {fileID: 11400000, guid: a1000000000000000000000000000001, type: 2}
   _primaryMinAmount: 2
   _primaryMaxAmount: 4
   _bonusYields: []
@@ -32,4 +32,4 @@ MonoBehaviour:
   _respawnTime: 60
   _canRespawn: 1
   _discoveryXP: 15
-  _worldPrefab: {fileID: 0}
+  _worldPrefab: {fileID: 5791705994551163401, guid: 80465e7215e5c354bb44c0d19802832d, type: 3}

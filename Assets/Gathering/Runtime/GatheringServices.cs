@@ -4,6 +4,8 @@ using System.Globalization;
 using UnityEngine;
 using Worldforge.Core.Bootstrap;
 using Worldforge.Core.Services;
+using Worldforge.Gathering;
+using Worldforge.Interaction;
 using Worldforge.Inventory.Services;
 using Worldforge.Item;
 
@@ -235,6 +237,17 @@ namespace Worldforge.Gathering.Services
                         gatheringService.RegisterNodeDefinition(preloadedNodes[i]);
                     }
                 }
+            }
+
+            // Register Gathering interaction handler if interaction service is available
+            if (context.Services.TryResolve<IInteractionService>(out var interactionService) && interactionService != null)
+            {
+                var gatheringHandler = new GatheringInteractionHandler(gatheringService, logger);
+                interactionService.RegisterHandler(gatheringHandler);
+                context.RegisterEventSubscription(
+                    "Gameplay.Gathering.InteractionHandler",
+                    () => interactionService.UnregisterHandler(gatheringHandler),
+                    110);
             }
 
             context.RecordRuntimeState("gathering.serviceLifetime", ServiceLifetime.Scoped.ToString());

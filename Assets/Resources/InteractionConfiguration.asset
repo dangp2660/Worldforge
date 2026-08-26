@@ -10,12 +10,12 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f60b9fee97ec53d43bbe18ba8ea5e8b3, type: 3}
-  m_Name: InteractionConfiguration
+  m_Name: 
   m_EditorClassIdentifier: Interaction::Worldforge.Interaction.InteractionConfiguration
   _maxDetectionDistance: 3.5
   _detectionLayerMask:
     serializedVersion: 2
-    m_Bits: 4294967295
+    m_Bits: 0
   _maxDetectionResults: 10
   _detectionInterval: 0.05
   _interactionCooldown: 0.3

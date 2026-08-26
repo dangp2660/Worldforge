@@ -16,7 +16,7 @@ MonoBehaviour:
   _displayName: Granite Rock
   _description: A dense rock deposit containing stone and mineral ore.
   _biomeType: Highland
-  _primaryYield: {fileID: 11400000, guid: a1000000000000000000000000000002, type: 3}
+  _primaryYield: {fileID: 11400000, guid: a1000000000000000000000000000002, type: 2}
   _primaryMinAmount: 2
   _primaryMaxAmount: 5
   _bonusYields: []
@@ -32,4 +32,4 @@ MonoBehaviour:
   _respawnTime: 90
   _canRespawn: 1
   _discoveryXP: 20
-  _worldPrefab: {fileID: 0}
+  _worldPrefab: {fileID: 414120795105039562, guid: 84d2dd2e9ba352841ad7a43576b2bbfb, type: 3}

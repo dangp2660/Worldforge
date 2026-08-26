@@ -18,27 +18,27 @@ namespace Worldforge.Interaction
         [Header("State")]
         [SerializeField] private bool _isInteractable = true;
 
-        public InteractionType Type
+        public virtual InteractionType Type
         {
             get { return _interactionType; }
         }
 
-        public string InteractionPrompt
+        public virtual string InteractionPrompt
         {
             get { return _interactionPrompt; }
         }
 
-        public float InteractionDuration
+        public virtual float InteractionDuration
         {
             get { return _interactionDuration; }
         }
 
-        public bool IsInteractable
+        public virtual bool IsInteractable
         {
             get { return _isInteractable && isActiveAndEnabled; }
         }
 
-        public Transform InteractionPoint
+        public virtual Transform InteractionPoint
         {
             get { return transform; }
         }

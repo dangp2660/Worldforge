@@ -4,6 +4,7 @@
   "references": [
     "Gathering",
     "Item",
+    "Interaction",
     "Core.Editor"
   ],
   "includePlatforms": [

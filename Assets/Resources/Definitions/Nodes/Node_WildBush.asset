@@ -14,9 +14,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Gathering::Worldforge.Gathering.ResourceNodeDefinition
   _nodeCode: NODE_WILD_BUSH
   _displayName: Wild Bush
-  _description: A lush wild bush with fibrous stems that can be gathered by hand or sickle.
+  _description: A lush wild bush with fibrous stems that can be gathered by hand
+    or sickle.
   _biomeType: Plains
-  _primaryYield: {fileID: 11400000, guid: a1000000000000000000000000000003, type: 3}
+  _primaryYield: {fileID: 11400000, guid: a1000000000000000000000000000003, type: 2}
   _primaryMinAmount: 1
   _primaryMaxAmount: 3
   _bonusYields: []
@@ -32,4 +33,4 @@ MonoBehaviour:
   _respawnTime: 45
   _canRespawn: 1
   _discoveryXP: 10
-  _worldPrefab: {fileID: 0}
+  _worldPrefab: {fileID: 4379581594147504884, guid: 3ecfccac0a910fc419cd3293a78ddf88, type: 3}

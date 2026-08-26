@@ -1,7 +1,9 @@
 using System.IO;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
 using Worldforge.Gathering;
+using Worldforge.Interaction;
 using Worldforge.Item;
 
 namespace Worldforge.Gathering.Editor
@@ -10,6 +12,7 @@ namespace Worldforge.Gathering.Editor
     {
         private const string ItemsDirectory = "Assets/Resources/Definitions/Items";
         private const string NodesDirectory = "Assets/Resources/Definitions/Nodes";
+        private const string PrefabsDirectory = "Assets/Prefabs/Nodes";
 
         [MenuItem("Worldforge/Setup/Setup Resource Definitions")]
         public static void SetupResourceDefinitions()
@@ -91,7 +94,7 @@ namespace Worldforge.Gathering.Editor
                 new ToolProperties(ToolType.Sickle, 1.0f, 1.5f, 1, 1f));
 
             // 3. Create Resource Nodes
-            CreateOrUpdateNode(
+            var oakTreeNode = CreateOrUpdateNode(
                 "Node_OakTree",
                 "NODE_OAK_TREE",
                 "Oak Tree",
@@ -106,9 +109,10 @@ namespace Worldforge.Gathering.Editor
                 2.5f,
                 60f,
                 true,
-                15);
+                15,
+                null);
 
-            CreateOrUpdateNode(
+            var graniteRockNode = CreateOrUpdateNode(
                 "Node_GraniteRock",
                 "NODE_GRANITE_ROCK",
                 "Granite Rock",
@@ -123,9 +127,10 @@ namespace Worldforge.Gathering.Editor
                 3.5f,
                 90f,
                 true,
-                20);
+                20,
+                null);
 
-            CreateOrUpdateNode(
+            var wildBushNode = CreateOrUpdateNode(
                 "Node_WildBush",
                 "NODE_WILD_BUSH",
                 "Wild Bush",
@@ -140,17 +145,61 @@ namespace Worldforge.Gathering.Editor
                 1.5f,
                 45f,
                 true,
-                10);
+                10,
+                null);
+
+            // 4. Create and associate Prefabs
+            var oakPrefab = CreateOakTreePrefab(oakTreeNode);
+            var rockPrefab = CreateGraniteRockPrefab(graniteRockNode);
+            var bushPrefab = CreateWildBushPrefab(wildBushNode);
+
+            SetNodePrefab(oakTreeNode, oakPrefab);
+            SetNodePrefab(graniteRockNode, rockPrefab);
+            SetNodePrefab(wildBushNode, bushPrefab);
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
             Debug.Log(
-                "[Worldforge] Resource definitions setup completed successfully.\n" +
+                "[Worldforge] Resource definitions and node prefabs setup completed successfully.\n" +
                 "1. Resource Items: Oak Wood Log, Granite Stone Ore, Plant Fiber\n" +
                 "2. Tool Items: Crude Stone Axe, Crude Stone Pickaxe, Crude Sickle\n" +
                 "3. Resource Nodes: Oak Tree, Granite Rock, Wild Bush\n" +
-                $"Location: {ItemsDirectory} & {NodesDirectory}");
+                "4. Prefabs: Node_OakTree_Prefab, Node_GraniteRock_Prefab, Node_WildBush_Prefab\n" +
+                $"Location: {ItemsDirectory}, {NodesDirectory}, {PrefabsDirectory}");
+        }
+
+        [MenuItem("Worldforge/Setup/Create Resource Nodes in Active Scene")]
+        public static void CreateResourceNodesInActiveScene()
+        {
+            SetupResourceDefinitions();
+
+            var oakDef = AssetDatabase.LoadAssetAtPath<ResourceNodeDefinition>($"{NodesDirectory}/Node_OakTree.asset");
+            var rockDef = AssetDatabase.LoadAssetAtPath<ResourceNodeDefinition>($"{NodesDirectory}/Node_GraniteRock.asset");
+            var bushDef = AssetDatabase.LoadAssetAtPath<ResourceNodeDefinition>($"{NodesDirectory}/Node_WildBush.asset");
+
+            var rootObj = GameObject.Find("Resource Nodes");
+            if (rootObj == null)
+            {
+                rootObj = new GameObject("Resource Nodes");
+                rootObj.transform.position = Vector3.zero;
+            }
+
+            // 1. Wild Bush (at center front)
+            CreateOrUpdateSceneNode("Node_WildBush_Scene", bushDef, new Vector3(0f, 0f, 4f), rootObj.transform);
+
+            // 2. Oak Tree (to right)
+            CreateOrUpdateSceneNode("Node_OakTree_Scene", oakDef, new Vector3(4f, 0f, 5f), rootObj.transform);
+
+            // 3. Granite Rock (to left)
+            CreateOrUpdateSceneNode("Node_GraniteRock_Scene", rockDef, new Vector3(-4f, 0f, 4f), rootObj.transform);
+
+            if (!Application.isPlaying)
+            {
+                EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
+            }
+
+            Debug.Log("[Worldforge] Created Resource Nodes in active scene under 'Resource Nodes' GameObject.");
         }
 
         private static void EnsureDirectoriesExist()
@@ -159,6 +208,8 @@ namespace Worldforge.Gathering.Editor
             EnsureDirectory("Assets/Resources/Definitions");
             EnsureDirectory(ItemsDirectory);
             EnsureDirectory(NodesDirectory);
+            EnsureDirectory("Assets/Prefabs");
+            EnsureDirectory(PrefabsDirectory);
         }
 
         private static void EnsureDirectory(string path)
@@ -233,7 +284,7 @@ namespace Worldforge.Gathering.Editor
             return item;
         }
 
-        private static void CreateOrUpdateNode(
+        private static ResourceNodeDefinition CreateOrUpdateNode(
             string assetName,
             string nodeCode,
             string displayName,
@@ -248,7 +299,8 @@ namespace Worldforge.Gathering.Editor
             float baseDuration,
             float respawnTime,
             bool canRespawn,
-            int discoveryXP)
+            int discoveryXP,
+            GameObject worldPrefab)
         {
             var path = $"{NodesDirectory}/{assetName}.asset";
             var existing = AssetDatabase.LoadAssetAtPath<ResourceNodeDefinition>(path);
@@ -281,6 +333,11 @@ namespace Worldforge.Gathering.Editor
             so.FindProperty("_canRespawn").boolValue = canRespawn;
             so.FindProperty("_discoveryXP").intValue = discoveryXP;
 
+            if (worldPrefab != null)
+            {
+                so.FindProperty("_worldPrefab").objectReferenceValue = worldPrefab;
+            }
+
             so.ApplyModifiedPropertiesWithoutUndo();
 
             if (existing == null)
@@ -290,6 +347,235 @@ namespace Worldforge.Gathering.Editor
             else
             {
                 EditorUtility.SetDirty(existing);
+            }
+
+            return node;
+        }
+
+        private static void SetNodePrefab(ResourceNodeDefinition definition, GameObject prefab)
+        {
+            if (definition == null || prefab == null) return;
+
+            var so = new SerializedObject(definition);
+            so.FindProperty("_worldPrefab").objectReferenceValue = prefab;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(definition);
+        }
+
+        private static GameObject CreateOakTreePrefab(ResourceNodeDefinition definition)
+        {
+            var prefabPath = $"{PrefabsDirectory}/Node_OakTree_Prefab.prefab";
+            var root = new GameObject("Node_OakTree");
+
+            var collider = root.AddComponent<CapsuleCollider>();
+            collider.center = new Vector3(0f, 1.5f, 0f);
+            collider.radius = 0.5f;
+            collider.height = 3.0f;
+
+            var intactVisual = new GameObject("IntactVisual");
+            intactVisual.transform.SetParent(root.transform, false);
+
+            var trunk = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            trunk.name = "Trunk";
+            trunk.transform.SetParent(intactVisual.transform, false);
+            trunk.transform.localPosition = new Vector3(0f, 1.25f, 0f);
+            trunk.transform.localScale = new Vector3(0.5f, 1.25f, 0.5f);
+            RemoveCollider(trunk);
+            SetColor(trunk, new Color(0.45f, 0.28f, 0.15f));
+
+            var foliage = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            foliage.name = "Foliage";
+            foliage.transform.SetParent(intactVisual.transform, false);
+            foliage.transform.localPosition = new Vector3(0f, 3.2f, 0f);
+            foliage.transform.localScale = new Vector3(2.5f, 2.2f, 2.5f);
+            RemoveCollider(foliage);
+            SetColor(foliage, new Color(0.18f, 0.55f, 0.22f));
+
+            var depletedVisual = new GameObject("DepletedVisual");
+            depletedVisual.transform.SetParent(root.transform, false);
+
+            var stump = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            stump.name = "Stump";
+            stump.transform.SetParent(depletedVisual.transform, false);
+            stump.transform.localPosition = new Vector3(0f, 0.2f, 0f);
+            stump.transform.localScale = new Vector3(0.6f, 0.2f, 0.6f);
+            RemoveCollider(stump);
+            SetColor(stump, new Color(0.38f, 0.24f, 0.12f));
+
+            depletedVisual.SetActive(false);
+
+            var nodeBehaviour = root.AddComponent<ResourceNodeBehaviour>();
+            var so = new SerializedObject(nodeBehaviour);
+            so.FindProperty("_definition").objectReferenceValue = definition;
+            so.FindProperty("_intactVisual").objectReferenceValue = intactVisual;
+            so.FindProperty("_depletedVisual").objectReferenceValue = depletedVisual;
+            so.FindProperty("_currentHealth").floatValue = definition != null ? definition.MaxHealth : 100f;
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            var savedPrefab = PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
+            Object.DestroyImmediate(root);
+
+            return savedPrefab;
+        }
+
+        private static GameObject CreateGraniteRockPrefab(ResourceNodeDefinition definition)
+        {
+            var prefabPath = $"{PrefabsDirectory}/Node_GraniteRock_Prefab.prefab";
+            var root = new GameObject("Node_GraniteRock");
+
+            var collider = root.AddComponent<BoxCollider>();
+            collider.center = new Vector3(0f, 0.75f, 0f);
+            collider.size = new Vector3(2.0f, 1.5f, 1.8f);
+
+            var intactVisual = new GameObject("IntactVisual");
+            intactVisual.transform.SetParent(root.transform, false);
+
+            var rockMain = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            rockMain.name = "RockMain";
+            rockMain.transform.SetParent(intactVisual.transform, false);
+            rockMain.transform.localPosition = new Vector3(0f, 0.75f, 0f);
+            rockMain.transform.localScale = new Vector3(1.8f, 1.4f, 1.6f);
+            rockMain.transform.localRotation = Quaternion.Euler(10f, 25f, 5f);
+            RemoveCollider(rockMain);
+            SetColor(rockMain, new Color(0.48f, 0.5f, 0.55f));
+
+            var depletedVisual = new GameObject("DepletedVisual");
+            depletedVisual.transform.SetParent(root.transform, false);
+
+            var rubble = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            rubble.name = "Rubble";
+            rubble.transform.SetParent(depletedVisual.transform, false);
+            rubble.transform.localPosition = new Vector3(0f, 0.15f, 0f);
+            rubble.transform.localScale = new Vector3(1.4f, 0.25f, 1.2f);
+            RemoveCollider(rubble);
+            SetColor(rubble, new Color(0.38f, 0.39f, 0.42f));
+
+            depletedVisual.SetActive(false);
+
+            var nodeBehaviour = root.AddComponent<ResourceNodeBehaviour>();
+            var so = new SerializedObject(nodeBehaviour);
+            so.FindProperty("_definition").objectReferenceValue = definition;
+            so.FindProperty("_intactVisual").objectReferenceValue = intactVisual;
+            so.FindProperty("_depletedVisual").objectReferenceValue = depletedVisual;
+            so.FindProperty("_currentHealth").floatValue = definition != null ? definition.MaxHealth : 150f;
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            var savedPrefab = PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
+            Object.DestroyImmediate(root);
+
+            return savedPrefab;
+        }
+
+        private static GameObject CreateWildBushPrefab(ResourceNodeDefinition definition)
+        {
+            var prefabPath = $"{PrefabsDirectory}/Node_WildBush_Prefab.prefab";
+            var root = new GameObject("Node_WildBush");
+
+            var collider = root.AddComponent<SphereCollider>();
+            collider.center = new Vector3(0f, 0.5f, 0f);
+            collider.radius = 0.8f;
+
+            var intactVisual = new GameObject("IntactVisual");
+            intactVisual.transform.SetParent(root.transform, false);
+
+            var bushCluster1 = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            bushCluster1.name = "Bush1";
+            bushCluster1.transform.SetParent(intactVisual.transform, false);
+            bushCluster1.transform.localPosition = new Vector3(0f, 0.5f, 0f);
+            bushCluster1.transform.localScale = new Vector3(1.4f, 0.9f, 1.3f);
+            RemoveCollider(bushCluster1);
+            SetColor(bushCluster1, new Color(0.25f, 0.65f, 0.28f));
+
+            var depletedVisual = new GameObject("DepletedVisual");
+            depletedVisual.transform.SetParent(root.transform, false);
+
+            var twigs = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            twigs.name = "Twigs";
+            twigs.transform.SetParent(depletedVisual.transform, false);
+            twigs.transform.localPosition = new Vector3(0f, 0.15f, 0f);
+            twigs.transform.localScale = new Vector3(0.5f, 0.15f, 0.5f);
+            RemoveCollider(twigs);
+            SetColor(twigs, new Color(0.35f, 0.25f, 0.18f));
+
+            depletedVisual.SetActive(false);
+
+            var nodeBehaviour = root.AddComponent<ResourceNodeBehaviour>();
+            var so = new SerializedObject(nodeBehaviour);
+            so.FindProperty("_definition").objectReferenceValue = definition;
+            so.FindProperty("_intactVisual").objectReferenceValue = intactVisual;
+            so.FindProperty("_depletedVisual").objectReferenceValue = depletedVisual;
+            so.FindProperty("_currentHealth").floatValue = definition != null ? definition.MaxHealth : 50f;
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            var savedPrefab = PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
+            Object.DestroyImmediate(root);
+
+            return savedPrefab;
+        }
+
+        private static void CreateOrUpdateSceneNode(
+            string name,
+            ResourceNodeDefinition definition,
+            Vector3 position,
+            Transform parent)
+        {
+            var existing = GameObject.Find(name);
+            if (existing != null)
+            {
+                Object.DestroyImmediate(existing);
+            }
+
+            GameObject nodeObj;
+            if (definition != null && definition.WorldPrefab != null)
+            {
+                nodeObj = (GameObject)PrefabUtility.InstantiatePrefab(definition.WorldPrefab);
+            }
+            else
+            {
+                nodeObj = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                nodeObj.AddComponent<ResourceNodeBehaviour>();
+            }
+
+            nodeObj.name = name;
+            nodeObj.transform.position = position;
+            nodeObj.transform.SetParent(parent, true);
+
+            var behaviour = nodeObj.GetComponent<ResourceNodeBehaviour>();
+            if (behaviour != null && definition != null)
+            {
+                behaviour.Initialize(definition);
+            }
+        }
+
+        private static void RemoveCollider(GameObject obj)
+        {
+            var col = obj.GetComponent<Collider>();
+            if (col != null)
+            {
+                Object.DestroyImmediate(col);
+            }
+        }
+
+        private static void SetColor(GameObject obj, Color color)
+        {
+            var renderer = obj.GetComponent<Renderer>();
+            if (renderer == null) return;
+
+            var shader = Shader.Find("Universal Render Pipeline/Lit");
+            if (shader == null)
+            {
+                shader = Shader.Find("Standard");
+            }
+
+            if (shader == null)
+            {
+                shader = Shader.Find("Diffuse");
+            }
+
+            if (shader != null)
+            {
+                var mat = new Material(shader) { color = color };
+                renderer.sharedMaterial = mat;
             }
         }
     }

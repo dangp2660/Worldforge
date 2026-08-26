@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Item::Worldforge.Item.ItemDefinition
   _itemCode: RES_WOOD
   _displayName: Oak Wood Log
-  _description: A sturdy oak wood log gathered from trees, essential for crafting and building.
+  _description: A sturdy oak wood log gathered from trees, essential for crafting
+    and building.
   _category: 0
   _rarity: 0
   _weight: 0.5

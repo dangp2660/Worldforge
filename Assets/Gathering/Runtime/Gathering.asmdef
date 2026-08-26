@@ -4,7 +4,8 @@
   "references": [
     "Core",
     "Inventory",
-    "Item"
+    "Item",
+    "Interaction"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],
