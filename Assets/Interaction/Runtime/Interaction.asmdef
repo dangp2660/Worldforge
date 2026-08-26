@@ -2,7 +2,9 @@
   "name": "Interaction",
   "rootNamespace": "Worldforge.Interaction",
   "references": [
-    "Core"
+    "Core",
+    "Character",
+    "Unity.InputSystem"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],
