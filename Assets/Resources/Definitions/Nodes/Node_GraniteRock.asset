@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f2000000000000000000000000000005, type: 3}
+  m_Name: Node_GraniteRock
+  m_EditorClassIdentifier: Gathering::Worldforge.Gathering.ResourceNodeDefinition
+  _nodeCode: NODE_GRANITE_ROCK
+  _displayName: Granite Rock
+  _description: A dense rock deposit containing stone and mineral ore.
+  _biomeType: Highland
+  _primaryYield: {fileID: 11400000, guid: a1000000000000000000000000000002, type: 3}
+  _primaryMinAmount: 2
+  _primaryMaxAmount: 5
+  _bonusYields: []
+  _requirements:
+    _requiredToolType: 2
+    _minimumHarvestPower: 2
+    _requiredToolTier: 1
+    _staminaCostPerAction: 8
+    _maxInteractionDistance: 2.5
+  _hardness: 2
+  _maxHealth: 150
+  _baseGatherDuration: 3.5
+  _respawnTime: 90
+  _canRespawn: 1
+  _discoveryXP: 20
+  _worldPrefab: {fileID: 0}

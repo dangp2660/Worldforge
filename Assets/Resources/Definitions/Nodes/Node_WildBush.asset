@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f2000000000000000000000000000005, type: 3}
+  m_Name: Node_WildBush
+  m_EditorClassIdentifier: Gathering::Worldforge.Gathering.ResourceNodeDefinition
+  _nodeCode: NODE_WILD_BUSH
+  _displayName: Wild Bush
+  _description: A lush wild bush with fibrous stems that can be gathered by hand or sickle.
+  _biomeType: Plains
+  _primaryYield: {fileID: 11400000, guid: a1000000000000000000000000000003, type: 3}
+  _primaryMinAmount: 1
+  _primaryMaxAmount: 3
+  _bonusYields: []
+  _requirements:
+    _requiredToolType: 0
+    _minimumHarvestPower: 0
+    _requiredToolTier: 0
+    _staminaCostPerAction: 2
+    _maxInteractionDistance: 2
+  _hardness: 0.5
+  _maxHealth: 50
+  _baseGatherDuration: 1.5
+  _respawnTime: 45
+  _canRespawn: 1
+  _discoveryXP: 10
+  _worldPrefab: {fileID: 0}

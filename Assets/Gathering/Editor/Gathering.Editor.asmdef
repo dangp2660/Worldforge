@@ -3,6 +3,7 @@
   "rootNamespace": "Worldforge.Gathering.Editor",
   "references": [
     "Gathering",
+    "Item",
     "Core.Editor"
   ],
   "includePlatforms": [

@@ -1,0 +1,43 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f1000000000000000000000000000007, type: 3}
+  m_Name: Item_Resource_Fiber
+  m_EditorClassIdentifier: Item::Worldforge.Item.ItemDefinition
+  _itemCode: RES_FIBER
+  _displayName: Plant Fiber
+  _description: Flexible organic fibers collected from wild bushes, used for weaving, binding, and primitive crafting.
+  _category: 0
+  _rarity: 0
+  _weight: 0.2
+  _maxStack: 100
+  _buyPrice: 1
+  _sellPrice: 1
+  _icon: {fileID: 0}
+  _iconPath: 
+  _prefab: {fileID: 0}
+  _worldPrefab: {fileID: 0}
+  _isUnique: 0
+  _isQuestItem: 0
+  _isTradable: 1
+  _isDroppable: 1
+  _canDestroy: 1
+  _resourceProperties:
+    _gatherTime: 1
+    _respawnTime: 45
+    _hardness: 0.5
+    _requiredToolType: 0
+  _toolProperties:
+    _toolType: 0
+    _harvestPower: 1
+    _efficiency: 1
+    _toolTier: 1
+    _durabilityCostPerUse: 1
