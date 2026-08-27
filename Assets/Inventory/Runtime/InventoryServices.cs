@@ -13,6 +13,9 @@ namespace Worldforge.Inventory.Services
         int RegisteredContainerCount { get; }
 
         void RegisterContainer(string containerId);
+        void RegisterContainer(IInventoryContainer container);
+        void UnregisterContainer(string containerId);
+        bool TryGetContainer(string containerId, out IInventoryContainer container);
     }
 
     public interface IInventorySessionService
@@ -23,6 +26,7 @@ namespace Worldforge.Inventory.Services
     public sealed class RuntimeInventoryService : IInventoryService
     {
         private readonly HashSet<string> registeredContainers = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, IInventoryContainer> containerMap = new(StringComparer.Ordinal);
 
         public int RegisteredContainerCount
         {
@@ -38,7 +42,41 @@ namespace Worldforge.Inventory.Services
 
             registeredContainers.Add(containerId);
         }
+
+        public void RegisterContainer(IInventoryContainer container)
+        {
+            if (container == null)
+            {
+                throw new ArgumentNullException(nameof(container));
+            }
+
+            RegisterContainer(container.ContainerId);
+            containerMap[container.ContainerId] = container;
+        }
+
+        public void UnregisterContainer(string containerId)
+        {
+            if (string.IsNullOrWhiteSpace(containerId))
+            {
+                return;
+            }
+
+            registeredContainers.Remove(containerId);
+            containerMap.Remove(containerId);
+        }
+
+        public bool TryGetContainer(string containerId, out IInventoryContainer container)
+        {
+            if (string.IsNullOrWhiteSpace(containerId))
+            {
+                container = null;
+                return false;
+            }
+
+            return containerMap.TryGetValue(containerId, out container);
+        }
     }
+
 
     public sealed class InventorySessionService : IInventorySessionService
     {
@@ -114,6 +152,8 @@ namespace Worldforge.Inventory.Services
             };
 
             context.RegisterTemporaryObject("Gameplay.Inventory.RuntimeRoot", runtimeRoot);
+            TryAttachToPlayer(inventoryService);
+
             context.RecordRuntimeState(
                 "inventory.registeredContainerCount",
                 inventoryService.RegisteredContainerCount.ToString(CultureInfo.InvariantCulture));
@@ -150,6 +190,28 @@ namespace Worldforge.Inventory.Services
                     "Inventory runtime observed active scene change: '{0}' -> '{1}'.",
                     previousScene.path,
                     nextScene.path));
+        }
+
+        private void TryAttachToPlayer(IInventoryService inventoryService)
+        {
+            var playerInventories = UnityEngine.Object.FindObjectsByType<PlayerInventoryBehaviour>(FindObjectsSortMode.None);
+            for (var i = 0; i < playerInventories.Length; i++)
+            {
+                var inv = playerInventories[i];
+                if (inv != null)
+                {
+                    inv.InitializeContainer();
+                    inventoryService.RegisterContainer(inv.Container);
+                }
+            }
+
+            var player = GameObject.Find("Worldforge.Player") ?? GameObject.FindWithTag("Player");
+            if (player != null && player.GetComponent<PlayerInventoryBehaviour>() == null)
+            {
+                var inv = player.AddComponent<PlayerInventoryBehaviour>();
+                inv.InitializeContainer();
+                inventoryService.RegisterContainer(inv.Container);
+            }
         }
     }
 }

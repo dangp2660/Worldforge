@@ -10,35 +10,35 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f1000000000000000000000000000007, type: 3}
-  m_Name: Item_Resource_Wood
+  m_Name: Item_Quest_AncientRelic
   m_EditorClassIdentifier: Item::Worldforge.Item.ItemDefinition
-  _itemCode: RES_WOOD
-  _displayName: Oak Wood Log
-  _description: A sturdy oak wood log gathered from trees, essential for crafting
-    and building.
-  _category: 0
-  _rarity: 0
+  _itemCode: QST_ANCIENT_RELIC
+  _displayName: Fragment of the Ancients
+  _description: A mysterious glyph-carved fragment vibrating with latent ancestral
+    energy.
+  _category: 5
+  _rarity: 2
   _gridWidth: 1
-  _gridHeight: 2
-  _weight: 0.5
-  _isStackable: 1
-  _maxStack: 100
-  _buyPrice: 2
-  _sellPrice: 1
+  _gridHeight: 1
+  _weight: 0
+  _isStackable: 0
+  _maxStack: 1
+  _buyPrice: 0
+  _sellPrice: 0
   _icon: {fileID: 0}
   _iconPath: 
   _prefab: {fileID: 0}
   _worldPrefab: {fileID: 0}
   _isUnique: 0
-  _isQuestItem: 0
-  _isTradable: 1
-  _isDroppable: 1
-  _canDestroy: 1
+  _isQuestItem: 1
+  _isTradable: 0
+  _isDroppable: 0
+  _canDestroy: 0
   _resourceProperties:
     _gatherTime: 2
     _respawnTime: 60
     _hardness: 1
-    _requiredToolType: 1
+    _requiredToolType: 0
   _toolProperties:
     _toolType: 0
     _harvestPower: 1

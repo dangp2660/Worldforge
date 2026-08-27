@@ -399,7 +399,10 @@ namespace Worldforge.Gathering.Editor
             so.FindProperty("_description").stringValue = description;
             so.FindProperty("_category").enumValueIndex = (int)category;
             so.FindProperty("_rarity").enumValueIndex = (int)rarity;
+            so.FindProperty("_gridWidth").intValue = 1;
+            so.FindProperty("_gridHeight").intValue = category == ItemCategoryType.Tool ? (itemCode == "TOOL_PICKAXE_01" ? 3 : 2) : (itemCode == "RES_WOOD" ? 2 : 1);
             so.FindProperty("_weight").floatValue = weight;
+            so.FindProperty("_isStackable").boolValue = category != ItemCategoryType.Tool && maxStack > 1;
             so.FindProperty("_maxStack").intValue = maxStack;
             so.FindProperty("_isTradable").boolValue = true;
             so.FindProperty("_isDroppable").boolValue = true;

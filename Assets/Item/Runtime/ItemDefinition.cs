@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 namespace Worldforge.Item
@@ -16,8 +17,13 @@ namespace Worldforge.Item
         [SerializeField] private ItemCategoryType _category = ItemCategoryType.Resource;
         [SerializeField] private ItemRarity _rarity = ItemRarity.Common;
 
-        [Header("Economy & Weight")]
+        [Header("Spatial Grid Footprint")]
+        [SerializeField, Range(1, 5)] private int _gridWidth = 1;
+        [SerializeField, Range(1, 5)] private int _gridHeight = 1;
+
+        [Header("Economy & Stacking")]
         [SerializeField] private float _weight = 0.5f;
+        [SerializeField] private bool _isStackable = true;
         [SerializeField] private int _maxStack = 100;
         [SerializeField] private int _buyPrice = 0;
         [SerializeField] private int _sellPrice = 0;
@@ -38,6 +44,11 @@ namespace Worldforge.Item
         [Header("Component Data")]
         [SerializeField] private ResourceProperties _resourceProperties = new();
         [SerializeField] private ToolProperties _toolProperties = new();
+        [SerializeField] private WeaponProperties _weaponProperties = new();
+        [SerializeField] private ArmorProperties _armorProperties = new();
+        [SerializeField] private ConsumableProperties _consumableProperties = new();
+        [SerializeField] private BackpackProperties _backpackProperties = new();
+        [SerializeField] private EquipmentProperties _equipmentProperties = new();
 
         public string ItemCode
         {
@@ -64,14 +75,41 @@ namespace Worldforge.Item
             get { return _rarity; }
         }
 
+        public int GridWidth
+        {
+            get { return _gridWidth; }
+        }
+
+        public int GridHeight
+        {
+            get { return _gridHeight; }
+        }
+
+        public Vector2Int GridSize
+        {
+            get { return new Vector2Int(_gridWidth, _gridHeight); }
+        }
+
+        public Vector2Int GetRotatedGridSize(bool isRotated)
+        {
+            return isRotated
+                ? new Vector2Int(_gridHeight, _gridWidth)
+                : new Vector2Int(_gridWidth, _gridHeight);
+        }
+
         public float Weight
         {
             get { return _weight; }
         }
 
+        public bool IsStackable
+        {
+            get { return _isStackable && _maxStack > 1; }
+        }
+
         public int MaxStack
         {
-            get { return _maxStack; }
+            get { return _isStackable ? _maxStack : 1; }
         }
 
         public int BuyPrice
@@ -139,6 +177,31 @@ namespace Worldforge.Item
             get { return _toolProperties; }
         }
 
+        public WeaponProperties WeaponProperties
+        {
+            get { return _weaponProperties; }
+        }
+
+        public ArmorProperties ArmorProperties
+        {
+            get { return _armorProperties; }
+        }
+
+        public ConsumableProperties ConsumableProperties
+        {
+            get { return _consumableProperties; }
+        }
+
+        public BackpackProperties BackpackProperties
+        {
+            get { return _backpackProperties; }
+        }
+
+        public EquipmentProperties EquipmentProperties
+        {
+            get { return _equipmentProperties; }
+        }
+
         public bool IsResource
         {
             get { return _category == ItemCategoryType.Resource; }
@@ -149,12 +212,71 @@ namespace Worldforge.Item
             get { return _category == ItemCategoryType.Tool; }
         }
 
+        public bool IsWeapon
+        {
+            get { return _category == ItemCategoryType.Weapon; }
+        }
+
+        public bool IsArmor
+        {
+            get { return _category == ItemCategoryType.Armor; }
+        }
+
+        public bool IsBackpack
+        {
+            get { return _category == ItemCategoryType.Backpack; }
+        }
+
+        public bool IsConsumable
+        {
+            get { return _category == ItemCategoryType.Consumable; }
+        }
+
+        public bool IsMaterial
+        {
+            get { return _category == ItemCategoryType.Material; }
+        }
+
+        public bool IsEquipmentCategory
+        {
+            get { return ItemCategoryUtility.IsEquipment(_category); }
+        }
+
+        public bool CanStackWith(ItemDefinition other)
+        {
+            if (other == null)
+            {
+                return false;
+            }
+
+            return string.Equals(_itemCode, other._itemCode, StringComparison.Ordinal) && IsStackable;
+        }
+
+        public float TotalWeightFor(int quantity)
+        {
+            return Mathf.Max(0, quantity) * _weight;
+        }
+
         private void OnValidate()
         {
+            _gridWidth = Mathf.Clamp(_gridWidth, 1, 5);
+            _gridHeight = Mathf.Clamp(_gridHeight, 1, 5);
             _weight = Mathf.Max(0f, _weight);
-            _maxStack = Mathf.Max(1, _maxStack);
             _buyPrice = Mathf.Max(0, _buyPrice);
             _sellPrice = Mathf.Max(0, _sellPrice);
+
+            // Apply stacking rules according to GDD specification
+            if (_isUnique || ItemCategoryUtility.IsEquipment(_category) || _category == ItemCategoryType.Tool ||
+                _category == ItemCategoryType.Deployable || _category == ItemCategoryType.Container ||
+                _category == ItemCategoryType.Special)
+            {
+                _isStackable = false;
+                _maxStack = 1;
+            }
+            else
+            {
+                _maxStack = Mathf.Max(1, _maxStack);
+            }
 
             if (_resourceProperties != null)
             {
@@ -164,6 +286,31 @@ namespace Worldforge.Item
             if (_toolProperties != null)
             {
                 _toolProperties.Validate();
+            }
+
+            if (_weaponProperties != null)
+            {
+                _weaponProperties.Validate();
+            }
+
+            if (_armorProperties != null)
+            {
+                _armorProperties.Validate();
+            }
+
+            if (_consumableProperties != null)
+            {
+                _consumableProperties.Validate();
+            }
+
+            if (_backpackProperties != null)
+            {
+                _backpackProperties.Validate();
+            }
+
+            if (_equipmentProperties != null)
+            {
+                _equipmentProperties.Validate();
             }
         }
     }

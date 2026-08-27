@@ -10,21 +10,21 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f1000000000000000000000000000007, type: 3}
-  m_Name: Item_Resource_Wood
+  m_Name: Item_Backpack_LeatherBackpack
   m_EditorClassIdentifier: Item::Worldforge.Item.ItemDefinition
-  _itemCode: RES_WOOD
-  _displayName: Oak Wood Log
-  _description: A sturdy oak wood log gathered from trees, essential for crafting
-    and building.
-  _category: 0
-  _rarity: 0
-  _gridWidth: 1
+  _itemCode: PACK_LEATHER_01
+  _displayName: Traveler Leather Backpack
+  _description: An expansive adventuring backpack providing additional storage slots
+    and carry capacity.
+  _category: 8
+  _rarity: 1
+  _gridWidth: 2
   _gridHeight: 2
-  _weight: 0.5
-  _isStackable: 1
-  _maxStack: 100
-  _buyPrice: 2
-  _sellPrice: 1
+  _weight: 1
+  _isStackable: 0
+  _maxStack: 1
+  _buyPrice: 60
+  _sellPrice: 25
   _icon: {fileID: 0}
   _iconPath: 
   _prefab: {fileID: 0}
@@ -38,7 +38,7 @@ MonoBehaviour:
     _gatherTime: 2
     _respawnTime: 60
     _hardness: 1
-    _requiredToolType: 1
+    _requiredToolType: 0
   _toolProperties:
     _toolType: 0
     _harvestPower: 1
@@ -69,7 +69,7 @@ MonoBehaviour:
     _bonusGridHeight: 2
     _carryCapacityBonus: 20
   _equipmentProperties:
-    _equipmentSlot: MainHand
+    _equipmentSlot: Backpack
     _requiredLevel: 1
-    _maxDurability: 100
+    _maxDurability: 150
     _durabilityMultiplier: 1

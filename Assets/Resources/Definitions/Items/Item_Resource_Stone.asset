@@ -13,14 +13,17 @@ MonoBehaviour:
   m_Name: Item_Resource_Stone
   m_EditorClassIdentifier: Item::Worldforge.Item.ItemDefinition
   _itemCode: RES_STONE
-  _displayName: Granite Stone Ore
-  _description: Dense granite stone mined from rocks, used in robust constructions
-    and tool forging.
+  _displayName: Stone Chunk
+  _description: A dense piece of rock mined from stone deposits, used in masonry
+    and forging.
   _category: 0
   _rarity: 0
+  _gridWidth: 1
+  _gridHeight: 1
   _weight: 1
+  _isStackable: 1
   _maxStack: 100
-  _buyPrice: 3
+  _buyPrice: 2
   _sellPrice: 1
   _icon: {fileID: 0}
   _iconPath: 
@@ -42,3 +45,31 @@ MonoBehaviour:
     _efficiency: 1
     _toolTier: 1
     _durabilityCostPerUse: 1
+  _weaponProperties:
+    _weaponType: Sword
+    _damageType: Physical
+    _baseDamage: 10
+    _attackSpeed: 1
+    _attackRange: 1.5
+    _criticalChance: 0.05
+    _criticalMultiplier: 1.5
+  _armorProperties:
+    _armorType: Chest
+    _armor: 5
+    _magicResistance: 0
+  _consumableProperties:
+    _cooldown: 1
+    _consumeTime: 1
+    _isReusable: 0
+    _healthRestored: 0
+    _staminaRestored: 0
+  _backpackProperties:
+    _bonusSlotCount: 8
+    _bonusGridWidth: 4
+    _bonusGridHeight: 2
+    _carryCapacityBonus: 20
+  _equipmentProperties:
+    _equipmentSlot: MainHand
+    _requiredLevel: 1
+    _maxDurability: 100
+    _durabilityMultiplier: 1

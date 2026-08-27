@@ -10,21 +10,21 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f1000000000000000000000000000007, type: 3}
-  m_Name: Item_Resource_Wood
+  m_Name: Item_Consumable_CookedMeat
   m_EditorClassIdentifier: Item::Worldforge.Item.ItemDefinition
-  _itemCode: RES_WOOD
-  _displayName: Oak Wood Log
-  _description: A sturdy oak wood log gathered from trees, essential for crafting
-    and building.
-  _category: 0
+  _itemCode: CONS_MEAT_COOKED
+  _displayName: Roast Boar Meat
+  _description: Savory fire-roasted meat that replenishes vital stamina and soothes
+    hunger.
+  _category: 3
   _rarity: 0
   _gridWidth: 1
-  _gridHeight: 2
+  _gridHeight: 1
   _weight: 0.5
   _isStackable: 1
-  _maxStack: 100
-  _buyPrice: 2
-  _sellPrice: 1
+  _maxStack: 10
+  _buyPrice: 8
+  _sellPrice: 3
   _icon: {fileID: 0}
   _iconPath: 
   _prefab: {fileID: 0}
@@ -38,7 +38,7 @@ MonoBehaviour:
     _gatherTime: 2
     _respawnTime: 60
     _hardness: 1
-    _requiredToolType: 1
+    _requiredToolType: 0
   _toolProperties:
     _toolType: 0
     _harvestPower: 1
@@ -58,11 +58,11 @@ MonoBehaviour:
     _armor: 5
     _magicResistance: 0
   _consumableProperties:
-    _cooldown: 1
-    _consumeTime: 1
+    _cooldown: 2
+    _consumeTime: 2
     _isReusable: 0
-    _healthRestored: 0
-    _staminaRestored: 0
+    _healthRestored: 20
+    _staminaRestored: 30
   _backpackProperties:
     _bonusSlotCount: 8
     _bonusGridWidth: 4

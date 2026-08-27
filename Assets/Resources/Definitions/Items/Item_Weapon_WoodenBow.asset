@@ -10,21 +10,21 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f1000000000000000000000000000007, type: 3}
-  m_Name: Item_Resource_Wood
+  m_Name: Item_Weapon_WoodenBow
   m_EditorClassIdentifier: Item::Worldforge.Item.ItemDefinition
-  _itemCode: RES_WOOD
-  _displayName: Oak Wood Log
-  _description: A sturdy oak wood log gathered from trees, essential for crafting
-    and building.
-  _category: 0
+  _itemCode: WEAP_BOW_01
+  _displayName: Hunter Shortbow
+  _description: A flexible curved bow capable of launching arrows accurately over
+    medium range.
+  _category: 6
   _rarity: 0
   _gridWidth: 1
-  _gridHeight: 2
-  _weight: 0.5
-  _isStackable: 1
-  _maxStack: 100
-  _buyPrice: 2
-  _sellPrice: 1
+  _gridHeight: 3
+  _weight: 1.2
+  _isStackable: 0
+  _maxStack: 1
+  _buyPrice: 40
+  _sellPrice: 16
   _icon: {fileID: 0}
   _iconPath: 
   _prefab: {fileID: 0}
@@ -38,7 +38,7 @@ MonoBehaviour:
     _gatherTime: 2
     _respawnTime: 60
     _hardness: 1
-    _requiredToolType: 1
+    _requiredToolType: 0
   _toolProperties:
     _toolType: 0
     _harvestPower: 1
@@ -46,13 +46,13 @@ MonoBehaviour:
     _toolTier: 1
     _durabilityCostPerUse: 1
   _weaponProperties:
-    _weaponType: Sword
+    _weaponType: Bow
     _damageType: Physical
-    _baseDamage: 10
-    _attackSpeed: 1
-    _attackRange: 1.5
-    _criticalChance: 0.05
-    _criticalMultiplier: 1.5
+    _baseDamage: 12
+    _attackSpeed: 0.9
+    _attackRange: 20
+    _criticalChance: 0.12
+    _criticalMultiplier: 1.8
   _armorProperties:
     _armorType: Chest
     _armor: 5
@@ -69,7 +69,7 @@ MonoBehaviour:
     _bonusGridHeight: 2
     _carryCapacityBonus: 20
   _equipmentProperties:
-    _equipmentSlot: MainHand
+    _equipmentSlot: TwoHand
     _requiredLevel: 1
     _maxDurability: 100
     _durabilityMultiplier: 1
