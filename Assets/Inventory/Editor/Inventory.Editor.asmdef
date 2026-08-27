@@ -3,6 +3,7 @@
   "rootNamespace": "Worldforge.Inventory.Editor",
   "references": [
     "Inventory",
+    "Item",
     "Item.Editor",
     "Core.Editor"
   ],

@@ -3,7 +3,8 @@
   "rootNamespace": "Worldforge.Inventory",
   "references": [
     "Core",
-    "Item"
+    "Item",
+    "Character"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],
