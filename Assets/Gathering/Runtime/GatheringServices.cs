@@ -17,6 +17,14 @@ namespace Worldforge.Gathering.Services
 
         int RegisteredNodeCount { get; }
 
+        int ActiveNodeCount { get; }
+
+        int TotalGatherCount { get; }
+
+        int TotalDepletedCount { get; }
+
+        int TotalRespawnedCount { get; }
+
         bool CanGather(string nodeId);
 
         void RegisterNodeDefinition(ResourceNodeDefinition definition);
@@ -27,8 +35,20 @@ namespace Worldforge.Gathering.Services
 
         IReadOnlyList<ResourceNodeDefinition> GetAllNodeDefinitions();
 
+        void RegisterActiveNode(ResourceNodeBehaviour node);
+
+        void UnregisterActiveNode(ResourceNodeBehaviour node);
+
+        IReadOnlyList<ResourceNodeBehaviour> GetAllActiveNodes();
+
         GatheringValidationResult ValidateGathering(
             ResourceNodeDefinition node,
+            IGatheringTool tool,
+            float playerStamina,
+            float distanceToNode);
+
+        GatheringValidationResult ValidateGathering(
+            ResourceNodeBehaviour node,
             IGatheringTool tool,
             float playerStamina,
             float distanceToNode);
@@ -36,12 +56,42 @@ namespace Worldforge.Gathering.Services
         float CalculateGatherDuration(ResourceNodeDefinition node, IGatheringTool tool);
 
         int CalculatePrimaryYield(ResourceNodeDefinition node, IGatheringTool tool, System.Random random = null);
+
+        GatheringHarvestResult ProcessGatheringAction(
+            ResourceNodeBehaviour node,
+            IGatheringTool tool,
+            GameObject interactor);
+
+        event Action<ResourceNodeGatheredEvent> NodeGathered;
+
+        event Action<ResourceNodeStateChangedEvent> NodeStateChanged;
+
+        event Action<ResourceNodeDepletedEvent> NodeDepleted;
+
+        event Action<ResourceNodeRespawnedEvent> NodeRespawned;
+
+        void NotifyNodeGathered(ResourceNodeGatheredEvent evt);
+
+        void NotifyNodeStateChanged(ResourceNodeStateChangedEvent evt);
+
+        void NotifyNodeDepleted(ResourceNodeDepletedEvent evt);
+
+        void NotifyNodeRespawned(ResourceNodeRespawnedEvent evt);
     }
 
-    public sealed class RuntimeGatheringService : IGatheringService
+    public sealed class RuntimeGatheringService : IGatheringService, IDisposable
     {
         private readonly Dictionary<string, ResourceNodeDefinition> _nodeDefinitions =
             new(StringComparer.OrdinalIgnoreCase);
+
+        private readonly List<ResourceNodeBehaviour> _activeNodes = new();
+
+        private int _totalGatherCount;
+        private int _totalDepletedCount;
+        private int _totalRespawnedCount;
+
+        [ThreadStatic]
+        private static System.Random s_sharedRandom;
 
         public RuntimeGatheringService()
         {
@@ -54,6 +104,31 @@ namespace Worldforge.Gathering.Services
         {
             get { return _nodeDefinitions.Count; }
         }
+
+        public int ActiveNodeCount
+        {
+            get { return _activeNodes.Count; }
+        }
+
+        public int TotalGatherCount
+        {
+            get { return _totalGatherCount; }
+        }
+
+        public int TotalDepletedCount
+        {
+            get { return _totalDepletedCount; }
+        }
+
+        public int TotalRespawnedCount
+        {
+            get { return _totalRespawnedCount; }
+        }
+
+        public event Action<ResourceNodeGatheredEvent> NodeGathered;
+        public event Action<ResourceNodeStateChangedEvent> NodeStateChanged;
+        public event Action<ResourceNodeDepletedEvent> NodeDepleted;
+        public event Action<ResourceNodeRespawnedEvent> NodeRespawned;
 
         public bool CanGather(string nodeId)
         {
@@ -103,8 +178,32 @@ namespace Worldforge.Gathering.Services
 
         public IReadOnlyList<ResourceNodeDefinition> GetAllNodeDefinitions()
         {
-            var list = new List<ResourceNodeDefinition>(_nodeDefinitions.Values);
-            return list;
+            return new List<ResourceNodeDefinition>(_nodeDefinitions.Values);
+        }
+
+        public void RegisterActiveNode(ResourceNodeBehaviour node)
+        {
+            if (node == null || _activeNodes.Contains(node))
+            {
+                return;
+            }
+
+            _activeNodes.Add(node);
+        }
+
+        public void UnregisterActiveNode(ResourceNodeBehaviour node)
+        {
+            if (node == null)
+            {
+                return;
+            }
+
+            _activeNodes.Remove(node);
+        }
+
+        public IReadOnlyList<ResourceNodeBehaviour> GetAllActiveNodes()
+        {
+            return _activeNodes.AsReadOnly();
         }
 
         public GatheringValidationResult ValidateGathering(
@@ -128,6 +227,22 @@ namespace Worldforge.Gathering.Services
             return node.Requirements.Validate(tool, playerStamina, distanceToNode);
         }
 
+        public GatheringValidationResult ValidateGathering(
+            ResourceNodeBehaviour node,
+            IGatheringTool tool,
+            float playerStamina,
+            float distanceToNode)
+        {
+            if (node == null)
+            {
+                return GatheringValidationResult.Failed(
+                    GatheringFailureReason.InvalidNode,
+                    "Resource node instance is null.");
+            }
+
+            return node.ValidateGathering(tool, playerStamina, distanceToNode);
+        }
+
         public float CalculateGatherDuration(ResourceNodeDefinition node, IGatheringTool tool)
         {
             if (node == null)
@@ -140,9 +255,6 @@ namespace Worldforge.Gathering.Services
 
             return baseDuration / efficiency;
         }
-
-        [ThreadStatic]
-        private static System.Random s_sharedRandom;
 
         public int CalculatePrimaryYield(ResourceNodeDefinition node, IGatheringTool tool, System.Random random = null)
         {
@@ -157,7 +269,7 @@ namespace Worldforge.Gathering.Services
             var rng = random ?? (s_sharedRandom ??= new System.Random());
             var baseAmount = rng.Next(min, max + 1);
 
-            // High tier or surplus harvest power provides a subtle scaling bonus if applicable
+            // Surplus harvest power above hardness provides extra yield scaling
             if (tool != null && tool.HarvestPower > node.Hardness && node.Hardness > 0f)
             {
                 var surplusRatio = (tool.HarvestPower - node.Hardness) / node.Hardness;
@@ -168,6 +280,54 @@ namespace Worldforge.Gathering.Services
             }
 
             return baseAmount;
+        }
+
+        public GatheringHarvestResult ProcessGatheringAction(
+            ResourceNodeBehaviour node,
+            IGatheringTool tool,
+            GameObject interactor)
+        {
+            if (node == null)
+            {
+                return GatheringHarvestResult.Failed("Resource node is null.");
+            }
+
+            var result = node.Harvest(tool, interactor);
+            return result;
+        }
+
+        public void NotifyNodeGathered(ResourceNodeGatheredEvent evt)
+        {
+            _totalGatherCount++;
+            NodeGathered?.Invoke(evt);
+        }
+
+        public void NotifyNodeStateChanged(ResourceNodeStateChangedEvent evt)
+        {
+            NodeStateChanged?.Invoke(evt);
+        }
+
+        public void NotifyNodeDepleted(ResourceNodeDepletedEvent evt)
+        {
+            _totalDepletedCount++;
+            NodeDepleted?.Invoke(evt);
+        }
+
+        public void NotifyNodeRespawned(ResourceNodeRespawnedEvent evt)
+        {
+            _totalRespawnedCount++;
+            NodeRespawned?.Invoke(evt);
+        }
+
+        public void Dispose()
+        {
+            _activeNodes.Clear();
+            _nodeDefinitions.Clear();
+
+            NodeGathered = null;
+            NodeStateChanged = null;
+            NodeDepleted = null;
+            NodeRespawned = null;
         }
     }
 
@@ -205,6 +365,8 @@ namespace Worldforge.Gathering.Services
         private static readonly IReadOnlyList<string> DependenciesList =
             new[] { "Gameplay.Inventory" };
 
+        private IGatheringService _gatheringService;
+
         public string Name
         {
             get { return "Gameplay.Gathering"; }
@@ -223,7 +385,7 @@ namespace Worldforge.Gathering.Services
         public void Initialize(GameSessionContext context)
         {
             context.Services.Resolve<IInventoryService>();
-            var gatheringService = context.Services.Resolve<IGatheringService>();
+            _gatheringService = context.Services.Resolve<IGatheringService>();
             var logger = context.Services.TryResolve<ILogService>(out var resolvedLogger) ? resolvedLogger : null;
 
             // Load any pre-configured ResourceNodeDefinitions in Resources
@@ -234,7 +396,7 @@ namespace Worldforge.Gathering.Services
                 {
                     if (preloadedNodes[i] != null && !string.IsNullOrWhiteSpace(preloadedNodes[i].NodeCode))
                     {
-                        gatheringService.RegisterNodeDefinition(preloadedNodes[i]);
+                        _gatheringService.RegisterNodeDefinition(preloadedNodes[i]);
                     }
                 }
             }
@@ -242,7 +404,7 @@ namespace Worldforge.Gathering.Services
             // Register Gathering interaction handler if interaction service is available
             if (context.Services.TryResolve<IInteractionService>(out var interactionService) && interactionService != null)
             {
-                var gatheringHandler = new GatheringInteractionHandler(gatheringService, logger);
+                var gatheringHandler = new GatheringInteractionHandler(_gatheringService, logger);
                 interactionService.RegisterHandler(gatheringHandler);
                 context.RegisterEventSubscription(
                     "Gameplay.Gathering.InteractionHandler",
@@ -253,19 +415,40 @@ namespace Worldforge.Gathering.Services
             context.RecordRuntimeState("gathering.serviceLifetime", ServiceLifetime.Scoped.ToString());
             context.RecordRuntimeState(
                 "gathering.registeredNodeCount",
-                gatheringService.RegisteredNodeCount.ToString(CultureInfo.InvariantCulture));
+                _gatheringService.RegisteredNodeCount.ToString(CultureInfo.InvariantCulture));
+            context.RecordRuntimeState(
+                "gathering.activeNodeCount",
+                _gatheringService.ActiveNodeCount.ToString(CultureInfo.InvariantCulture));
             context.RegisterRuntimeResource("Gameplay.Gathering.RuntimeCache", new GatheringRuntimeCache());
 
-            logger?.Info("Gameplay.Gathering", "Gathering gameplay module initialized with " + gatheringService.RegisteredNodeCount + " node definitions.");
+            logger?.Info(
+                "Gameplay.Gathering",
+                $"Gathering gameplay module initialized with {_gatheringService.RegisteredNodeCount} node definitions.");
         }
 
         public void Shutdown(GameSessionContext context)
         {
-            if (context.Services.TryResolve<IGatheringService>(out var gatheringService) && gatheringService != null)
+            if (_gatheringService != null)
             {
                 context.RecordRuntimeState(
                     "gathering.registeredNodeCount",
-                    gatheringService.RegisteredNodeCount.ToString(CultureInfo.InvariantCulture));
+                    _gatheringService.RegisteredNodeCount.ToString(CultureInfo.InvariantCulture));
+                context.RecordRuntimeState(
+                    "gathering.activeNodeCount",
+                    _gatheringService.ActiveNodeCount.ToString(CultureInfo.InvariantCulture));
+                context.RecordRuntimeState(
+                    "gathering.totalGatherCount",
+                    _gatheringService.TotalGatherCount.ToString(CultureInfo.InvariantCulture));
+                context.RecordRuntimeState(
+                    "gathering.totalDepletedCount",
+                    _gatheringService.TotalDepletedCount.ToString(CultureInfo.InvariantCulture));
+
+                if (_gatheringService is IDisposable disposable)
+                {
+                    disposable.Dispose();
+                }
+
+                _gatheringService = null;
             }
 
             context.RecordRuntimeState("gathering.serviceLifetime", ServiceLifetime.Scoped.ToString());

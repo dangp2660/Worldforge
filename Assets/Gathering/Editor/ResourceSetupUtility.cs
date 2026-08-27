@@ -2,7 +2,9 @@ using System.IO;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using Worldforge.Character.Player;
 using Worldforge.Gathering;
+using Worldforge.Gathering.Services;
 using Worldforge.Interaction;
 using Worldforge.Item;
 
@@ -103,6 +105,7 @@ namespace Worldforge.Gathering.Editor
                 woodItem,
                 2,
                 4,
+                new[] { new ResourceYieldEntry(fiberItem, 1, 2, 0.35f) },
                 new GatheringRequirements(ToolType.Axe, 1.0f, 1, 5f, 3.0f),
                 1.0f,
                 100f,
@@ -121,6 +124,7 @@ namespace Worldforge.Gathering.Editor
                 stoneItem,
                 2,
                 5,
+                new[] { new ResourceYieldEntry(stoneItem, 1, 2, 0.25f) },
                 new GatheringRequirements(ToolType.Pickaxe, 2.0f, 1, 8f, 2.5f),
                 2.0f,
                 150f,
@@ -139,6 +143,7 @@ namespace Worldforge.Gathering.Editor
                 fiberItem,
                 1,
                 3,
+                new[] { new ResourceYieldEntry(fiberItem, 1, 1, 0.5f) },
                 new GatheringRequirements(ToolType.None, 0.0f, 0, 2f, 2.0f),
                 0.5f,
                 50f,
@@ -172,6 +177,12 @@ namespace Worldforge.Gathering.Editor
         [MenuItem("Worldforge/Setup/Create Resource Nodes in Active Scene")]
         public static void CreateResourceNodesInActiveScene()
         {
+            const string scenePath = "Assets/Scenes/WorldforgeDevelopment.unity";
+            if (File.Exists(scenePath) && EditorSceneManager.GetActiveScene().path != scenePath)
+            {
+                EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Single);
+            }
+
             SetupResourceDefinitions();
 
             var oakDef = AssetDatabase.LoadAssetAtPath<ResourceNodeDefinition>($"{NodesDirectory}/Node_OakTree.asset");
@@ -196,10 +207,153 @@ namespace Worldforge.Gathering.Editor
 
             if (!Application.isPlaying)
             {
-                EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
+                var activeScene = EditorSceneManager.GetActiveScene();
+                EditorSceneManager.MarkSceneDirty(activeScene);
+                EditorSceneManager.SaveScene(activeScene);
             }
 
             Debug.Log("[Worldforge] Created Resource Nodes in active scene under 'Resource Nodes' GameObject.");
+        }
+
+        [MenuItem("Worldforge/Setup/Attach Basic Tools to Player Avatar")]
+        public static void AttachBasicToolsToPlayerAvatar()
+        {
+            var player = GameObject.Find("Player") ?? GameObject.FindWithTag("Player");
+            if (player == null)
+            {
+                var avatar = Object.FindAnyObjectByType<PlayerAvatar>();
+                if (avatar != null)
+                {
+                    player = avatar.gameObject;
+                }
+            }
+
+            if (player == null)
+            {
+                Debug.LogWarning("[Worldforge] Player GameObject not found in active scene. Start game or select player first.");
+                return;
+            }
+
+            var axeDef = AssetDatabase.LoadAssetAtPath<ItemDefinition>($"{ItemsDirectory}/Item_Tool_BasicAxe.asset");
+            var toolBehaviour = player.GetComponent<GatheringToolBehaviour>();
+            if (toolBehaviour == null)
+            {
+                toolBehaviour = player.AddComponent<GatheringToolBehaviour>();
+            }
+
+            if (axeDef != null)
+            {
+                toolBehaviour.ToolItem = axeDef;
+            }
+            else
+            {
+                toolBehaviour.Configure(ToolType.Axe, 1.5f, 1.0f, 1, 1f);
+            }
+
+            Debug.Log($"[Worldforge] GatheringToolBehaviour attached/configured on '{player.name}' with Axe tool.");
+        }
+
+        [MenuItem("Worldforge/Testing/Run Gathering Validation Checks")]
+        public static void RunGatheringValidationChecks()
+        {
+            Debug.Log("<b><color=#00E5FF>[Worldforge Gathering Test]</color></b> Starting gathering workflow validation checks...");
+
+            var woodDef = Resources.Load<ItemDefinition>("Definitions/Items/Item_Resource_Wood");
+            var stoneDef = Resources.Load<ItemDefinition>("Definitions/Items/Item_Resource_Stone");
+            var fiberDef = Resources.Load<ItemDefinition>("Definitions/Items/Item_Resource_Fiber");
+            var axeDef = Resources.Load<ItemDefinition>("Definitions/Items/Item_Tool_BasicAxe");
+            var pickaxeDef = Resources.Load<ItemDefinition>("Definitions/Items/Item_Tool_BasicPickaxe");
+
+            var oakDef = Resources.Load<ResourceNodeDefinition>("Definitions/Nodes/Node_OakTree");
+            var rockDef = Resources.Load<ResourceNodeDefinition>("Definitions/Nodes/Node_GraniteRock");
+            var bushDef = Resources.Load<ResourceNodeDefinition>("Definitions/Nodes/Node_WildBush");
+
+            var allDefinitionsValid = woodDef != null && stoneDef != null && fiberDef != null &&
+                                      axeDef != null && pickaxeDef != null &&
+                                      oakDef != null && rockDef != null && bushDef != null;
+
+            if (!allDefinitionsValid)
+            {
+                Debug.LogError("[Worldforge Gathering Test] Failed to load one or more ScriptableObject definitions from Resources/Definitions/. Run 'Worldforge > Setup > Setup Resource Definitions' first.");
+                return;
+            }
+
+            Debug.Log("[Worldforge Gathering Test] <color=#00FF66>✓ Test 1/5 PASSED:</color> All Item and ResourceNode Definition assets loaded successfully.");
+
+            // 2. Tool requirement validation
+            var axeTool = new ToolProperties(ToolType.Axe, 1.5f, 1.0f, 1, 1f);
+            var pickaxeTool = new ToolProperties(ToolType.Pickaxe, 2.5f, 1.0f, 1, 1f);
+
+            var bushHandValidation = bushDef.Requirements.Validate(null, 10f, 1.5f);
+            var oakHandValidation = oakDef.Requirements.Validate(null, 10f, 1.5f);
+            var oakAxeValidation = oakDef.Requirements.Validate(axeTool, 10f, 1.5f);
+            var rockPickaxeValidation = rockDef.Requirements.Validate(pickaxeTool, 10f, 1.5f);
+
+            if (!bushHandValidation.IsSuccess || oakHandValidation.IsSuccess || !oakAxeValidation.IsSuccess || !rockPickaxeValidation.IsSuccess)
+            {
+                Debug.LogError("[Worldforge Gathering Test] Failed: Tool requirement validation check mismatch.");
+                return;
+            }
+
+            Debug.Log("[Worldforge Gathering Test] <color=#00FF66>✓ Test 2/5 PASSED:</color> Tool type, tier, and power validations verified (Hand vs Axe vs Pickaxe).");
+
+            // 3. Distance & Stamina constraints
+            var outOfRangeValidation = oakDef.Requirements.Validate(axeTool, 10f, 10f);
+            var lowStaminaValidation = oakDef.Requirements.Validate(axeTool, 1f, 1.5f);
+
+            if (outOfRangeValidation.FailureReason != GatheringFailureReason.OutOfRange ||
+                lowStaminaValidation.FailureReason != GatheringFailureReason.InsufficientStamina)
+            {
+                Debug.LogError("[Worldforge Gathering Test] Failed: Distance or Stamina failure reason mismatch.");
+                return;
+            }
+
+            Debug.Log("[Worldforge Gathering Test] <color=#00FF66>✓ Test 3/5 PASSED:</color> Distance and Stamina failure constraints correctly enforced.");
+
+            // 4. Dynamic Duration & Harvest Yield calculations
+            var service = new RuntimeGatheringService();
+            var normalDuration = service.CalculateGatherDuration(oakDef, null);
+            var fastTool = new ToolProperties(ToolType.Axe, 2.0f, 2.0f, 1, 1f);
+            var fastDuration = service.CalculateGatherDuration(oakDef, fastTool);
+
+            if (fastDuration >= normalDuration)
+            {
+                Debug.LogError($"[Worldforge Gathering Test] Failed: Efficiency 2.0 did not reduce gather duration (Normal: {normalDuration}s, Fast: {fastDuration}s).");
+                service.Dispose();
+                return;
+            }
+
+            var primaryYield = service.CalculatePrimaryYield(oakDef, axeTool);
+            if (primaryYield < oakDef.PrimaryMinAmount)
+            {
+                Debug.LogError("[Worldforge Gathering Test] Failed: Harvest yield calculation returned amount less than minimum.");
+                service.Dispose();
+                return;
+            }
+
+            Debug.Log($"[Worldforge Gathering Test] <color=#00FF66>✓ Test 4/5 PASSED:</color> Dynamic duration & yield calculations verified (Yielded: {primaryYield}x {oakDef.PrimaryYield.DisplayName}, Duration: {normalDuration:F1}s -> {fastDuration:F1}s).");
+
+            // 5. Service & Domain Event dispatching
+            var eventFired = false;
+            service.NodeGathered += (evt) => { eventFired = true; };
+
+            var dummyObj = new GameObject("TestNode");
+            var nodeBehaviour = dummyObj.AddComponent<ResourceNodeBehaviour>();
+            nodeBehaviour.Initialize(bushDef);
+            nodeBehaviour.BindGatheringService(service);
+
+            var actionResult = service.ProcessGatheringAction(nodeBehaviour, null, null);
+            Object.DestroyImmediate(dummyObj);
+            service.Dispose();
+
+            if (!actionResult.IsSuccess || !eventFired)
+            {
+                Debug.LogError("[Worldforge Gathering Test] Failed: Gathering service process action or domain event dispatch failed.");
+                return;
+            }
+
+            Debug.Log("[Worldforge Gathering Test] <color=#00FF66>✓ Test 5/5 PASSED:</color> RuntimeGatheringService harvest action & domain event dispatching verified.");
+            Debug.Log("<b><color=#00FF66>[Worldforge Gathering Test] ALL GATHERING TESTS PASSED (5/5)!</color></b>");
         }
 
         private static void EnsureDirectoriesExist()
@@ -293,6 +447,7 @@ namespace Worldforge.Gathering.Editor
             ItemDefinition primaryYield,
             int minAmount,
             int maxAmount,
+            ResourceYieldEntry[] bonusYields,
             GatheringRequirements requirements,
             float hardness,
             float maxHealth,
@@ -315,6 +470,20 @@ namespace Worldforge.Gathering.Editor
             so.FindProperty("_primaryYield").objectReferenceValue = primaryYield;
             so.FindProperty("_primaryMinAmount").intValue = minAmount;
             so.FindProperty("_primaryMaxAmount").intValue = maxAmount;
+
+            if (bonusYields != null && bonusYields.Length > 0)
+            {
+                var bonusProp = so.FindProperty("_bonusYields");
+                bonusProp.arraySize = bonusYields.Length;
+                for (var i = 0; i < bonusYields.Length; i++)
+                {
+                    var elem = bonusProp.GetArrayElementAtIndex(i);
+                    elem.FindPropertyRelative("_item").objectReferenceValue = bonusYields[i].Item;
+                    elem.FindPropertyRelative("_minAmount").intValue = bonusYields[i].MinAmount;
+                    elem.FindPropertyRelative("_maxAmount").intValue = bonusYields[i].MaxAmount;
+                    elem.FindPropertyRelative("_dropChance").floatValue = bonusYields[i].DropChance;
+                }
+            }
 
             if (requirements != null)
             {

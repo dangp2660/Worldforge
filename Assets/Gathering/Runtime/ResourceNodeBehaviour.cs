@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using Worldforge.Gathering.Services;
 using Worldforge.Interaction;
 using Worldforge.Item;
 
@@ -31,6 +32,8 @@ namespace Worldforge.Gathering
 
         private Collider _cachedCollider;
         private System.Random _random;
+        private float _activeGatherDuration;
+        private IGatheringService _gatheringService;
 
         public event Action<ResourceNodeBehaviour, ResourceNodeState> StateChanged;
         public event Action<ResourceNodeBehaviour, GatheringHarvestResult> Gathered;
@@ -133,7 +136,15 @@ namespace Worldforge.Gathering
 
         public override float InteractionDuration
         {
-            get { return _definition != null ? Mathf.Max(0.1f, _definition.BaseGatherDuration) : 1.5f; }
+            get
+            {
+                if (_activeGatherDuration > 0f)
+                {
+                    return _activeGatherDuration;
+                }
+
+                return _definition != null ? Mathf.Max(0.1f, _definition.BaseGatherDuration) : 1.5f;
+            }
         }
 
         public override bool IsInteractable
@@ -155,6 +166,16 @@ namespace Worldforge.Gathering
             UpdateVisuals();
         }
 
+        private void OnEnable()
+        {
+            _gatheringService?.RegisterActiveNode(this);
+        }
+
+        private void OnDisable()
+        {
+            _gatheringService?.UnregisterActiveNode(this);
+        }
+
         private void Update()
         {
             if (_state != ResourceNodeState.Respawning)
@@ -170,11 +191,30 @@ namespace Worldforge.Gathering
             }
         }
 
-        public void Initialize(ResourceNodeDefinition definition)
+        public void BindGatheringService(IGatheringService gatheringService)
+        {
+            if (_gatheringService == gatheringService)
+            {
+                return;
+            }
+
+            _gatheringService?.UnregisterActiveNode(this);
+            _gatheringService = gatheringService;
+            _gatheringService?.RegisterActiveNode(this);
+        }
+
+        public void Initialize(ResourceNodeDefinition definition, IGatheringService gatheringService = null)
         {
             _definition = definition;
             _currentHealth = definition != null ? definition.MaxHealth : 100f;
             _remainingRespawnTime = 0f;
+            _activeGatherDuration = 0f;
+
+            if (gatheringService != null)
+            {
+                BindGatheringService(gatheringService);
+            }
+
             SetState(ResourceNodeState.Available);
 
             SyncInteractableFields();
@@ -183,7 +223,12 @@ namespace Worldforge.Gathering
 
         public void SetDefinition(ResourceNodeDefinition definition)
         {
-            Initialize(definition);
+            Initialize(definition, _gatheringService);
+        }
+
+        public void SetActiveGatherDuration(float duration)
+        {
+            _activeGatherDuration = Mathf.Max(0.05f, duration);
         }
 
         public void SetState(ResourceNodeState newState)
@@ -201,6 +246,8 @@ namespace Worldforge.Gathering
             UpdateVisuals();
 
             StateChanged?.Invoke(this, newState);
+            _gatheringService?.NotifyNodeStateChanged(
+                new ResourceNodeStateChangedEvent(this, previousState, newState, Time.time));
         }
 
         public GatheringValidationResult ValidateGathering(IGatheringTool tool, float playerStamina, float distanceToNode)
@@ -212,7 +259,7 @@ namespace Worldforge.Gathering
                     "Resource node has no definition assigned.");
             }
 
-            if (IsDepleted || _state == ResourceNodeState.Disabled)
+            if (IsDepleted || _state == ResourceNodeState.Disabled || _currentHealth <= 0f)
             {
                 return GatheringValidationResult.Failed(
                     GatheringFailureReason.NodeDepleted,
@@ -237,7 +284,7 @@ namespace Worldforge.Gathering
             var harvestPower = tool != null ? Mathf.Max(0.1f, tool.HarvestPower) : 1f;
             var hardness = _definition != null ? Mathf.Max(0.1f, _definition.Hardness) : 1f;
 
-            // Damage formula scales with tool power vs hardness, normalized to baseline 50 dmg
+            // Damage scales with tool power vs hardness, normalized to baseline 50 dmg
             return Mathf.Max(1f, (harvestPower / hardness) * 50f);
         }
 
@@ -248,7 +295,7 @@ namespace Worldforge.Gathering
                 return GatheringHarvestResult.Failed("Resource node definition is missing.");
             }
 
-            if (IsDepleted || _state == ResourceNodeState.Disabled)
+            if (IsDepleted || _state == ResourceNodeState.Disabled || _currentHealth <= 0f)
             {
                 return GatheringHarvestResult.Failed("Resource node is not available.");
             }
@@ -303,6 +350,8 @@ namespace Worldforge.Gathering
                 SetState(ResourceNodeState.Available);
             }
 
+            _activeGatherDuration = 0f;
+
             var result = GatheringHarvestResult.Success(
                 _definition.PrimaryYield,
                 primaryAmount,
@@ -313,6 +362,8 @@ namespace Worldforge.Gathering
                 wasDepleted);
 
             Gathered?.Invoke(this, result);
+            _gatheringService?.NotifyNodeGathered(
+                new ResourceNodeGatheredEvent(this, interactor, result, Time.time));
 
             return result;
         }
@@ -346,11 +397,13 @@ namespace Worldforge.Gathering
             }
 
             _currentHealth = 0f;
+            var respawnDuration = 0f;
 
             var canRespawn = _definition != null && _definition.CanRespawn && _definition.RespawnTime > 0f;
             if (canRespawn)
             {
-                _remainingRespawnTime = _definition.RespawnTime;
+                respawnDuration = _definition.RespawnTime;
+                _remainingRespawnTime = respawnDuration;
                 SetState(ResourceNodeState.Respawning);
             }
             else
@@ -365,6 +418,8 @@ namespace Worldforge.Gathering
             }
 
             Depleted?.Invoke(this);
+            _gatheringService?.NotifyNodeDepleted(
+                new ResourceNodeDepletedEvent(this, interactor, respawnDuration, Time.time));
 
             return true;
         }
@@ -373,6 +428,7 @@ namespace Worldforge.Gathering
         {
             _currentHealth = MaxHealth;
             _remainingRespawnTime = 0f;
+            _activeGatherDuration = 0f;
             SetState(ResourceNodeState.Available);
 
             if (_disableColliderWhenDepleted && _cachedCollider != null)
@@ -381,6 +437,8 @@ namespace Worldforge.Gathering
             }
 
             Respawned?.Invoke(this);
+            _gatheringService?.NotifyNodeRespawned(
+                new ResourceNodeRespawnedEvent(this, Time.time));
         }
 
         public void SetDisabled(bool disabled)
@@ -398,6 +456,7 @@ namespace Worldforge.Gathering
         public void ResetNode()
         {
             _remainingRespawnTime = 0f;
+            _activeGatherDuration = 0f;
             _currentHealth = MaxHealth;
             SetState(ResourceNodeState.Available);
 
@@ -409,6 +468,7 @@ namespace Worldforge.Gathering
 
         public void CancelGathering()
         {
+            _activeGatherDuration = 0f;
             if (_state == ResourceNodeState.Gathering)
             {
                 SetState(ResourceNodeState.Available);
@@ -433,6 +493,7 @@ namespace Worldforge.Gathering
         public override void OnInteractionCompleted(InteractionContext context)
         {
             base.OnInteractionCompleted(context);
+            _activeGatherDuration = 0f;
         }
 
         private void UpdateVisuals()

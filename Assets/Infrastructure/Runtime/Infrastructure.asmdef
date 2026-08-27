@@ -5,6 +5,7 @@
     "Core",
     "Inventory",
     "Gathering",
+    "Interaction",
     "Character",
     "UnityEngine.UI",
     "Unity.InputSystem"

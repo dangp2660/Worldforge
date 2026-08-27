@@ -19,7 +19,11 @@ MonoBehaviour:
   _primaryYield: {fileID: 11400000, guid: a1000000000000000000000000000001, type: 2}
   _primaryMinAmount: 2
   _primaryMaxAmount: 4
-  _bonusYields: []
+  _bonusYields:
+  - _item: {fileID: 11400000, guid: a1000000000000000000000000000003, type: 2}
+    _minAmount: 1
+    _maxAmount: 2
+    _dropChance: 0.35
   _requirements:
     _requiredToolType: 1
     _minimumHarvestPower: 1

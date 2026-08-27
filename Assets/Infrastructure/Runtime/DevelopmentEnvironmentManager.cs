@@ -1,5 +1,6 @@
 using UnityEngine;
 using Worldforge.Character.Spawning;
+using Worldforge.Gathering;
 
 namespace Worldforge.Infrastructure.Development
 {
@@ -21,6 +22,7 @@ namespace Worldforge.Infrastructure.Development
         [SerializeField, Range(0f, 1f)] private float floorSmoothness = 0f;
         [SerializeField, Range(0f, 1f)] private float markerSmoothness = 0.05f;
         [SerializeField] private bool generateOnAwake = true;
+        [SerializeField] private bool createResourceNodesOnAwake = true;
 
         public Transform EnvironmentRoot
         {
@@ -38,6 +40,11 @@ namespace Worldforge.Infrastructure.Development
             CreateFloor();
             CreateCornerMarkers();
             CreatePlayerSpawnAnchor();
+
+            if (createResourceNodesOnAwake)
+            {
+                CreateDevelopmentResourceNodes();
+            }
         }
 
         private void ClearGeneratedChildren()
@@ -91,6 +98,57 @@ namespace Worldforge.Infrastructure.Development
             spawnAnchor.transform.localScale = Vector3.one;
             spawnAnchor.AddComponent<PlayerSpawnPoint>();
             spawnAnchor.AddComponent<Worldforge.Core.Bootstrap.GameSessionSpawnPoint>();
+        }
+
+        private void CreateDevelopmentResourceNodes()
+        {
+            var existingNodes = Object.FindObjectsByType<ResourceNodeBehaviour>(FindObjectsInactive.Exclude);
+            if (existingNodes != null && existingNodes.Length > 0)
+            {
+                return;
+            }
+
+            var bushDef = Resources.Load<ResourceNodeDefinition>("Definitions/Nodes/Node_WildBush");
+            var oakDef = Resources.Load<ResourceNodeDefinition>("Definitions/Nodes/Node_OakTree");
+            var rockDef = Resources.Load<ResourceNodeDefinition>("Definitions/Nodes/Node_GraniteRock");
+
+            var root = EnvironmentRoot;
+
+            if (bushDef != null)
+            {
+                CreateNodeObject($"{GeneratedObjectPrefix}Node_WildBush", bushDef, new Vector3(0f, floorHeight, 4f), root);
+            }
+            if (oakDef != null)
+            {
+                CreateNodeObject($"{GeneratedObjectPrefix}Node_OakTree", oakDef, new Vector3(4f, floorHeight, 5f), root);
+            }
+            if (rockDef != null)
+            {
+                CreateNodeObject($"{GeneratedObjectPrefix}Node_GraniteRock", rockDef, new Vector3(-4f, floorHeight, 4f), root);
+            }
+        }
+
+        private void CreateNodeObject(string nodeName, ResourceNodeDefinition definition, Vector3 worldPosition, Transform parent)
+        {
+            GameObject nodeObj;
+            if (definition.WorldPrefab != null)
+            {
+                nodeObj = Instantiate(definition.WorldPrefab, worldPosition, Quaternion.identity, parent);
+            }
+            else
+            {
+                nodeObj = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                nodeObj.transform.SetParent(parent, false);
+                nodeObj.transform.position = worldPosition;
+                nodeObj.AddComponent<ResourceNodeBehaviour>();
+            }
+
+            nodeObj.name = nodeName;
+            var behaviour = nodeObj.GetComponent<ResourceNodeBehaviour>();
+            if (behaviour != null)
+            {
+                behaviour.Initialize(definition);
+            }
         }
 
         private static void ApplyGeneratedMaterial(GameObject target, Color color, float smoothness)
