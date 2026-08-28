@@ -13,9 +13,9 @@ MonoBehaviour:
   m_Name: Item_Resource_Stone
   m_EditorClassIdentifier: Item::Worldforge.Item.ItemDefinition
   _itemCode: RES_STONE
-  _displayName: Granite Stone Ore
-  _description: Dense granite stone mined from rocks, used in robust constructions
-    and tool forging.
+  _displayName: Stone Chunk
+  _description: A dense piece of rock mined from stone deposits, used in masonry
+    and forging.
   _category: 0
   _rarity: 0
   _gridWidth: 1

@@ -14,13 +14,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: Item::Worldforge.Item.ItemDefinition
   _itemCode: RES_FIBER
   _displayName: Plant Fiber
-  _description: Flexible organic fibers collected from wild bushes, used for weaving,
-    binding, and primitive crafting.
+  _description: Flexible plant fibers harvested from bushes, used to weave ropes,
+    fabrics, and bandages.
   _category: 0
   _rarity: 0
   _gridWidth: 1
   _gridHeight: 1
-  _weight: 0.2
+  _weight: 0.1
   _isStackable: 1
   _maxStack: 100
   _buyPrice: 1
@@ -36,9 +36,9 @@ MonoBehaviour:
   _canDestroy: 1
   _resourceProperties:
     _gatherTime: 1
-    _respawnTime: 45
+    _respawnTime: 30
     _hardness: 0.5
-    _requiredToolType: 0
+    _requiredToolType: 3
   _toolProperties:
     _toolType: 0
     _harvestPower: 1

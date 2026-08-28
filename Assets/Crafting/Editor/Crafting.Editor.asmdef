@@ -3,6 +3,8 @@
   "rootNamespace": "Worldforge.Crafting.Editor",
   "references": [
     "Crafting",
+    "Item",
+    "Inventory",
     "Item.Editor",
     "Inventory.Editor",
     "Core.Editor"

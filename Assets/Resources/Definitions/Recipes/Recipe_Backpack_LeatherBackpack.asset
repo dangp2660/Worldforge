@@ -1,0 +1,35 @@
+﻿%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4000000000000000000000000000004, type: 3}
+  m_Name: Recipe_Backpack_LeatherBackpack
+  m_EditorClassIdentifier: Crafting::Worldforge.Crafting.RecipeDefinition
+  _recipeCode: RECIPE_PACK_LEATHER_01
+  _displayName: Traveler Leather Backpack
+  _description: Stitch cured leather and fiber binding into an expansive adventurer backpack.
+  _recipeType: 0
+  _stationType: 0
+  _craftFunction: 
+  _craftTime: 0
+  _requiredLevel: 1
+  _successRate: 1
+  _isUnlockedByDefault: 1
+  _ingredients:
+  - _item: {fileID: 11400000, guid: a1000000000000000000000000000009, type: 2}
+    _amount: 4
+    _isConsumed: 1
+  - _item: {fileID: 11400000, guid: a1000000000000000000000000000003, type: 2}
+    _amount: 3
+    _isConsumed: 1
+  _outputs:
+  - _item: {fileID: 11400000, guid: a100000000000000000000000000000e, type: 2}
+    _amount: 1
+    _probability: 1

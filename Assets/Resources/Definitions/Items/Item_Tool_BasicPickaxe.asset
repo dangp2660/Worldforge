@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Item::Worldforge.Item.ItemDefinition
   _itemCode: TOOL_PICKAXE_01
   _displayName: Crude Stone Pickaxe
-  _description: A heavy stone pickaxe for breaking rocks and harvesting stone ore.
+  _description: A primitive pickaxe capable of fracturing stone boulders and extracting
+    minerals.
   _category: 1
   _rarity: 0
   _gridWidth: 1
@@ -40,7 +41,7 @@ MonoBehaviour:
     _requiredToolType: 0
   _toolProperties:
     _toolType: 2
-    _harvestPower: 2.5
+    _harvestPower: 1.5
     _efficiency: 1
     _toolTier: 1
     _durabilityCostPerUse: 1
