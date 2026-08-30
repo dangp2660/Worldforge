@@ -486,7 +486,7 @@ namespace Worldforge.Infrastructure.Editor.MethodTester
                     foreach (var s in nonEmptySlots)
                     {
                         var name = s.Item != null ? s.Item.DisplayName : "Unknown";
-                        GUILayout.Button($"<b>{name}</b> x{s.Quantity}", EditorStyles.helpBox, GUILayout.Width(120), GUILayout.Height(30));
+                        GUILayout.Button($"{name} x{s.Quantity}", EditorStyles.helpBox, GUILayout.Width(140), GUILayout.Height(28));
                     }
                 }
 
@@ -745,8 +745,20 @@ namespace Worldforge.Infrastructure.Editor.MethodTester
             var container = GetActiveInventoryContainer();
             TakeInventorySnapshot(container);
 
+            // Bind container to any parameter expecting IInventoryContainer
+            if (selectedMethod.Parameters != null)
+            {
+                foreach (var p in selectedMethod.Parameters)
+                {
+                    if (typeof(IInventoryContainer).IsAssignableFrom(p.ParameterType))
+                    {
+                        p.ResolvedValue = container;
+                    }
+                }
+            }
+
             // Ensure target instance is bound in Edit Mode
-            if (!Application.isPlaying && selectedMethod.TargetInstance == null)
+            if (!Application.isPlaying)
             {
                 if (selectedMethod.TargetType == typeof(ICraftingService))
                 {

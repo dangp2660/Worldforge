@@ -57,6 +57,13 @@ namespace Worldforge.Crafting
         {
             return new CraftingValidationResult(false, reason, message, missingItem, requiredAmount, availableAmount);
         }
+
+        public override string ToString()
+        {
+            return IsValid
+                ? "[CraftingValidationResult: SUCCESS] All requirements met."
+                : $"[CraftingValidationResult: FAILED] Reason: {FailureReason}, Message: {Message}";
+        }
     }
 
     public sealed class CraftingResult
@@ -126,6 +133,18 @@ namespace Worldforge.Crafting
                 recipe,
                 Array.Empty<ItemStack>(),
                 consumedIngredients);
+        }
+
+        public override string ToString()
+        {
+            if (IsSuccess)
+            {
+                var prodCount = ProducedItems != null ? ProducedItems.Count : 0;
+                var consCount = ConsumedIngredients != null ? ConsumedIngredients.Count : 0;
+                return $"[CraftingResult: SUCCESS] Recipe='{Recipe?.DisplayName ?? Recipe?.RecipeCode ?? "Unknown"}', Produced={prodCount} stack(s), Consumed={consCount} stack(s).";
+            }
+
+            return $"[CraftingResult: FAILED] Reason={FailureReason}, Message='{Message}', Recipe='{Recipe?.DisplayName ?? Recipe?.RecipeCode ?? "None"}'.";
         }
     }
 }

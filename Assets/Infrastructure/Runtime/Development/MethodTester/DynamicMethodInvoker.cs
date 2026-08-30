@@ -265,6 +265,11 @@ namespace Worldforge.Infrastructure.Development.MethodTester
             // Handle special interfaces like IInventoryContainer
             if (typeof(IInventoryContainer).IsAssignableFrom(targetType))
             {
+                if (p.ResolvedValue is IInventoryContainer resolvedContainer)
+                {
+                    return resolvedContainer;
+                }
+
                 if (BootstrapManager.HasInstance && BootstrapManager.Instance.Services != null &&
                     BootstrapManager.Instance.Services.TryResolve<IInventoryContainer>(out var activeContainer) &&
                     activeContainer != null)

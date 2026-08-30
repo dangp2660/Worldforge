@@ -17,6 +17,7 @@ namespace Worldforge.Crafting.Editor
         private const string RecipesDirectory = "Assets/Resources/Definitions/Recipes";
         private const string ItemsDirectory = "Assets/Resources/Definitions/Items";
 
+        [InitializeOnLoadMethod]
         [MenuItem("Worldforge/Setup/Configure All Recipe Definitions", priority = 102)]
         public static void ConfigureAllRecipeDefinitions()
         {

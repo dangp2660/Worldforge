@@ -330,6 +330,7 @@ namespace Worldforge.Crafting
             var validation = ValidateCraft(recipe, inventory, currentStation, characterLevel);
             if (!validation.IsValid)
             {
+                Debug.LogWarning($"[Crafting] Validation failed for '{recipe?.DisplayName ?? "Unknown"}': {validation.Message} (Reason: {validation.FailureReason})");
                 return CraftingResult.Failure(validation.FailureReason, validation.Message, recipe);
             }
 
@@ -352,6 +353,7 @@ namespace Worldforge.Crafting
                     {
                         // Rollback previously consumed ingredients
                         RollbackConsumedItems(inventory, consumedItems);
+                        Debug.LogError($"[Crafting] Failed to remove ingredient '{ingredient.Item.DisplayName}' during transaction for '{recipe.DisplayName}'.");
 
                         return CraftingResult.Failure(
                             CraftingFailureReason.MissingIngredients,
@@ -371,6 +373,7 @@ namespace Worldforge.Crafting
                     $"Crafting '{recipe.DisplayName}' failed (success rate {recipe.SuccessRate:P0}). Ingredients were consumed.",
                     recipe,
                     consumedItems);
+                Debug.LogWarning($"[Crafting] Crafting failed for '{recipe.DisplayName}' (Success Rate {recipe.SuccessRate:P0}). Ingredients were consumed.");
                 CraftingCompleted?.Invoke(failResult);
                 return failResult;
             }
@@ -391,15 +394,22 @@ namespace Worldforge.Crafting
                     {
                         // AddItem returns the number of items actually added
                         var actualProduced = inventory.AddItem(output.Item, output.Amount);
-                        if (actualProduced <= 0)
+                        if (actualProduced < output.Amount)
                         {
-                            // Output could not be added — rollback all produced outputs and consumed ingredients
+                            // Output could not be fully added — rollback partial addition, previous outputs, and consumed ingredients
+                            if (actualProduced > 0)
+                            {
+                                inventory.RemoveItem(output.Item, actualProduced);
+                            }
+
                             RollbackProducedItems(inventory, producedItems);
                             RollbackConsumedItems(inventory, consumedItems);
 
+                            Debug.LogWarning($"[Crafting] Insufficient inventory space for '{output.Item.DisplayName}' (added {actualProduced}/{output.Amount}). Transaction rolled back.");
+
                             return CraftingResult.Failure(
                                 CraftingFailureReason.InsufficientInventorySpace,
-                                $"Failed to add output '{output.Item.DisplayName}' to inventory during transaction. All changes rolled back.",
+                                $"Failed to add full output quantity for '{output.Item.DisplayName}' (added {actualProduced}/{output.Amount}). Transaction rolled back.",
                                 recipe);
                         }
 
@@ -409,6 +419,7 @@ namespace Worldforge.Crafting
             }
 
             var result = CraftingResult.Success(recipe, producedItems, consumedItems);
+            Debug.Log($"[Crafting] Successfully crafted '{recipe.DisplayName}'. Produced: {producedItems.Count} item stack(s), Consumed: {consumedItems.Count} ingredient stack(s).");
             CraftingCompleted?.Invoke(result);
             return result;
         }
