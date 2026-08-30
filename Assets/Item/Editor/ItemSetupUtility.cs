@@ -451,23 +451,33 @@ namespace Worldforge.Item.Editor
             var startingItemsProp = so.FindProperty("_startingItems");
             startingItemsProp.ClearArray();
 
-            var axe = AssetDatabase.LoadAssetAtPath<ItemDefinition>($"{ItemsDirectory}/Item_Tool_BasicAxe.asset");
-            var potion = AssetDatabase.LoadAssetAtPath<ItemDefinition>($"{ItemsDirectory}/Item_Consumable_HealthPotion.asset");
+            var axe = AssetDatabase.LoadAssetAtPath<ItemDefinition>($"{ItemsDirectory}/Item_Tool_BasicAxe.asset") 
+                ?? Resources.Load<ItemDefinition>("Definitions/Items/Item_Tool_BasicAxe");
+            var potion = AssetDatabase.LoadAssetAtPath<ItemDefinition>($"{ItemsDirectory}/Item_Consumable_HealthPotion.asset")
+                ?? Resources.Load<ItemDefinition>("Definitions/Items/Item_Consumable_HealthPotion");
 
             if (axe != null)
             {
-                startingItemsProp.InsertArrayElementAtIndex(0);
-                var entry = startingItemsProp.GetArrayElementAtIndex(0);
-                entry.FindPropertyRelative("_item").objectReferenceValue = axe;
-                entry.FindPropertyRelative("_amount").intValue = 1;
+                var index = startingItemsProp.arraySize;
+                startingItemsProp.InsertArrayElementAtIndex(index);
+                var entry = startingItemsProp.GetArrayElementAtIndex(index);
+                if (entry != null)
+                {
+                    entry.FindPropertyRelative("_item").objectReferenceValue = axe;
+                    entry.FindPropertyRelative("_amount").intValue = 1;
+                }
             }
 
             if (potion != null)
             {
-                startingItemsProp.InsertArrayElementAtIndex(1);
-                var entry = startingItemsProp.GetArrayElementAtIndex(1);
-                entry.FindPropertyRelative("_item").objectReferenceValue = potion;
-                entry.FindPropertyRelative("_amount").intValue = 3;
+                var index = startingItemsProp.arraySize;
+                startingItemsProp.InsertArrayElementAtIndex(index);
+                var entry = startingItemsProp.GetArrayElementAtIndex(index);
+                if (entry != null)
+                {
+                    entry.FindPropertyRelative("_item").objectReferenceValue = potion;
+                    entry.FindPropertyRelative("_amount").intValue = 3;
+                }
             }
 
             so.ApplyModifiedPropertiesWithoutUndo();

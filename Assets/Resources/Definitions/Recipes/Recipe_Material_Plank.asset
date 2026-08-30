@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Crafting::Worldforge.Crafting.RecipeDefinition
   _recipeCode: RECIPE_MAT_PLANK
   _displayName: Refined Wood Plank
-  _description: Process raw wood logs into refined timber planks for construction and crafting.
+  _description: Process raw wood logs into refined timber planks for construction
+    and crafting.
   _recipeType: 1
   _stationType: 0
   _craftFunction: 
@@ -24,7 +25,7 @@ MonoBehaviour:
   _isUnlockedByDefault: 1
   _ingredients:
   - _item: {fileID: 11400000, guid: a1000000000000000000000000000001, type: 2}
-    _amount: 3
+    _amount: 1
     _isConsumed: 1
   _outputs:
   - _item: {fileID: 11400000, guid: a1000000000000000000000000000008, type: 2}

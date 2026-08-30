@@ -1,4 +1,4 @@
-﻿%YAML 1.1
+%YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
 --- !u!114 &11400000
 MonoBehaviour:
@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Crafting::Worldforge.Crafting.RecipeDefinition
   _recipeCode: RECIPE_PACK_LEATHER_01
   _displayName: Traveler Leather Backpack
-  _description: Stitch cured leather and fiber binding into an expansive adventurer backpack.
+  _description: Stitch cured leather and fiber binding into an expansive adventurer
+    backpack.
   _recipeType: 0
   _stationType: 0
   _craftFunction: 
