@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Item::Worldforge.Item.ItemDefinition
   _itemCode: TOOL_AXE_01
   _displayName: Crude Stone Axe
-  _description: A primitive stone axe suitable for chopping trees and gathering wood.
+  _description: A primitive axe suitable for chopping trees and gathering wood.
   _category: 1
   _rarity: 0
   _gridWidth: 1
