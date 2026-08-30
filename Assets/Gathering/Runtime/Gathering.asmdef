@@ -5,7 +5,8 @@
     "Core",
     "Inventory",
     "Item",
-    "Interaction"
+    "Interaction",
+    "Character"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],

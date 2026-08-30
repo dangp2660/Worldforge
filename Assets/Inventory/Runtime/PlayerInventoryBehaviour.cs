@@ -124,14 +124,63 @@ namespace Worldforge.Inventory
 
                 if (_container != null)
                 {
-                    _container.ItemAdded += _ => UpdateDebugFields();
+                    _container.ItemAdded += OnItemAdded;
                     _container.ItemRemoved += _ => UpdateDebugFields();
                     _container.SlotChanged += _ => UpdateDebugFields();
                 }
 
                 UpdateDebugFields();
+                AutoEquipTool();
             }
         }
+
+        private void OnItemAdded(InventoryItemAddedEvent evt)
+        {
+            UpdateDebugFields();
+
+            if (evt.Item != null && evt.Item.IsTool)
+            {
+                var toolBehaviour = GetComponent<GatheringToolBehaviour>();
+                if (toolBehaviour != null && !toolBehaviour.HasEquippedTool)
+                {
+                    toolBehaviour.EquipTool(evt.Item);
+                }
+            }
+        }
+
+        public bool EquipTool(ItemDefinition toolItem)
+        {
+            if (toolItem == null || !toolItem.IsTool)
+            {
+                return false;
+            }
+
+            var toolBehaviour = GetComponent<GatheringToolBehaviour>();
+            if (toolBehaviour == null)
+            {
+                toolBehaviour = gameObject.AddComponent<GatheringToolBehaviour>();
+            }
+
+            return toolBehaviour.EquipTool(toolItem);
+        }
+
+        public ItemDefinition GetEquippedTool()
+        {
+            var toolBehaviour = GetComponent<GatheringToolBehaviour>();
+            return toolBehaviour != null ? toolBehaviour.ToolItem : null;
+        }
+
+        public bool AutoEquipTool(ToolType requiredType = ToolType.None)
+        {
+            var tool = GetFirstTool(requiredType);
+            if (tool != null)
+            {
+                return EquipTool(tool);
+            }
+
+            return false;
+        }
+
 
         public int AddItem(ItemDefinition item, int amount)
         {
@@ -169,6 +218,41 @@ namespace Worldforge.Inventory
         }
 
         /// <summary>
+        /// Finds the first tool item definition matching the requested tool type (or any tool if None).
+        /// </summary>
+        public ItemDefinition GetFirstTool(ToolType toolType = ToolType.None)
+        {
+            if (_container == null)
+            {
+                InitializeContainer();
+            }
+
+            if (_container == null)
+            {
+                return null;
+            }
+
+            for (var i = 0; i < _container.SlotCount; i++)
+            {
+                var slot = _container.GetSlot(i);
+                if (slot != null && !slot.IsEmpty && slot.Item != null && slot.Item.IsTool)
+                {
+                    if (toolType == ToolType.None || (slot.Item.ToolProperties != null && slot.Item.ToolProperties.ToolType == toolType))
+                    {
+                        return slot.Item;
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        public bool HasToolOfType(ToolType toolType)
+        {
+            return GetFirstTool(toolType) != null;
+        }
+
+        /// <summary>
         /// Receives items yielded from gathering nodes and inserts them into player inventory.
         /// </summary>
         public bool ReceiveItem(ItemDefinition item, int amount)
@@ -199,6 +283,7 @@ namespace Worldforge.Inventory
                 $"[PlayerInventory] Could not receive '{item.DisplayName}' (Inventory full or overweight).");
             return false;
         }
+
 
         private void UpdateDebugFields()
         {

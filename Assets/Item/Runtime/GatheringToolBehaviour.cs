@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using Worldforge.Core.Attributes;
 
 namespace Worldforge.Item
 {
@@ -9,6 +10,7 @@ namespace Worldforge.Item
     /// </summary>
     [DisallowMultipleComponent]
     [AddComponentMenu("Worldforge/Item/Gathering Tool Behaviour")]
+    [TestTarget(Category = "Item", DisplayName = "Gathering Tool", Order = 25)]
     public sealed class GatheringToolBehaviour : MonoBehaviour, IGatheringTool, IGatheringToolProvider
     {
         [Header("Tool Item Definition")]
@@ -21,6 +23,8 @@ namespace Worldforge.Item
         [SerializeField] private int _toolTier = 1;
         [SerializeField] private float _durabilityCostPerUse = 1f;
 
+        public event Action<ItemDefinition> ToolChanged;
+
         public ItemDefinition ToolItem
         {
             get { return _toolItem; }
@@ -28,7 +32,13 @@ namespace Worldforge.Item
             {
                 _toolItem = value;
                 SyncFromItemDefinition();
+                ToolChanged?.Invoke(_toolItem);
             }
+        }
+
+        public bool HasEquippedTool
+        {
+            get { return _toolItem != null && _toolItem.IsTool; }
         }
 
         public ToolType ToolType
@@ -81,6 +91,33 @@ namespace Worldforge.Item
             SyncFromItemDefinition();
         }
 
+        [TestMethod(DisplayName = "Equip Tool", IsPrimary = true, Order = 1, Description = "Equips a tool item definition")]
+        public bool EquipTool(ItemDefinition toolItem)
+        {
+            if (toolItem == null || !toolItem.IsTool)
+            {
+                return false;
+            }
+
+            _toolItem = toolItem;
+            SyncFromItemDefinition();
+            ToolChanged?.Invoke(_toolItem);
+            return true;
+        }
+
+        [TestMethod(DisplayName = "Unequip Tool", IsPrimary = true, Order = 2, Description = "Unequips current tool and resets to None")]
+        public void UnequipTool()
+        {
+            _toolItem = null;
+            _toolType = ToolType.None;
+            _harvestPower = 1f;
+            _efficiency = 1f;
+            _toolTier = 1;
+            _durabilityCostPerUse = 1f;
+            ToolChanged?.Invoke(null);
+        }
+
+        [TestMethod(DisplayName = "Configure Custom Tool", IsPrimary = false, Description = "Configures custom gathering tool properties directly")]
         public void Configure(ToolType toolType, float harvestPower, float efficiency = 1f, int toolTier = 1, float durabilityCost = 1f)
         {
             _toolItem = null;
@@ -89,6 +126,7 @@ namespace Worldforge.Item
             _efficiency = Mathf.Max(0.1f, efficiency);
             _toolTier = Mathf.Max(0, toolTier);
             _durabilityCostPerUse = Mathf.Max(0f, durabilityCost);
+            ToolChanged?.Invoke(null);
         }
 
         private void SyncFromItemDefinition()

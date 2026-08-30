@@ -2,10 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using UnityEngine;
+using UnityEngine.SceneManagement;
+using Worldforge.Character.Spawning;
 using Worldforge.Core.Bootstrap;
 using Worldforge.Core.Services;
 using Worldforge.Gathering;
 using Worldforge.Interaction;
+using Worldforge.Inventory;
 using Worldforge.Inventory.Services;
 using Worldforge.Item;
 
@@ -366,6 +369,8 @@ namespace Worldforge.Gathering.Services
             new[] { "Gameplay.Inventory" };
 
         private IGatheringService _gatheringService;
+        private IPlayerSpawnService _spawnService;
+        private ILogService _logger;
 
         public string Name
         {
@@ -386,7 +391,7 @@ namespace Worldforge.Gathering.Services
         {
             context.Services.Resolve<IInventoryService>();
             _gatheringService = context.Services.Resolve<IGatheringService>();
-            var logger = context.Services.TryResolve<ILogService>(out var resolvedLogger) ? resolvedLogger : null;
+            _logger = context.Services.TryResolve<ILogService>(out var resolvedLogger) ? resolvedLogger : null;
 
             // Load any pre-configured ResourceNodeDefinitions in Resources
             var preloadedNodes = UnityEngine.Resources.LoadAll<ResourceNodeDefinition>("Definitions/Nodes");
@@ -404,13 +409,45 @@ namespace Worldforge.Gathering.Services
             // Register Gathering interaction handler if interaction service is available
             if (context.Services.TryResolve<IInteractionService>(out var interactionService) && interactionService != null)
             {
-                var gatheringHandler = new GatheringInteractionHandler(_gatheringService, logger);
+                var gatheringHandler = new GatheringInteractionHandler(_gatheringService, _logger);
                 interactionService.RegisterHandler(gatheringHandler);
                 context.RegisterEventSubscription(
                     "Gameplay.Gathering.InteractionHandler",
                     () => interactionService.UnregisterHandler(gatheringHandler),
                     110);
             }
+
+            // Listen for Player spawn to ensure GatheringToolBehaviour is attached to the player
+            if (context.Services.TryResolve<IPlayerSpawnService>(out var spawnService) && spawnService != null)
+            {
+                _spawnService = spawnService;
+                _spawnService.PlayerSpawned -= OnPlayerSpawned;
+                _spawnService.PlayerSpawned += OnPlayerSpawned;
+
+                context.RegisterEventSubscription(
+                    "Gameplay.Gathering.PlayerSpawned",
+                    () =>
+                    {
+                        if (_spawnService != null)
+                        {
+                            _spawnService.PlayerSpawned -= OnPlayerSpawned;
+                        }
+                    },
+                    110);
+
+                if (_spawnService.HasActivePlayer)
+                {
+                    TryAttachToolBehaviour(_spawnService.ActivePlayer);
+                }
+            }
+
+            SceneManager.sceneLoaded -= OnSceneLoaded;
+            SceneManager.sceneLoaded += OnSceneLoaded;
+
+            context.RegisterEventSubscription(
+                "Gameplay.Gathering.SceneLoaded",
+                () => SceneManager.sceneLoaded -= OnSceneLoaded,
+                110);
 
             context.RecordRuntimeState("gathering.serviceLifetime", ServiceLifetime.Scoped.ToString());
             context.RecordRuntimeState(
@@ -421,13 +458,21 @@ namespace Worldforge.Gathering.Services
                 _gatheringService.ActiveNodeCount.ToString(CultureInfo.InvariantCulture));
             context.RegisterRuntimeResource("Gameplay.Gathering.RuntimeCache", new GatheringRuntimeCache());
 
-            logger?.Info(
+            _logger?.Info(
                 "Gameplay.Gathering",
                 $"Gathering gameplay module initialized with {_gatheringService.RegisteredNodeCount} node definitions.");
         }
 
         public void Shutdown(GameSessionContext context)
         {
+            SceneManager.sceneLoaded -= OnSceneLoaded;
+
+            if (_spawnService != null)
+            {
+                _spawnService.PlayerSpawned -= OnPlayerSpawned;
+                _spawnService = null;
+            }
+
             if (_gatheringService != null)
             {
                 context.RecordRuntimeState(
@@ -451,7 +496,60 @@ namespace Worldforge.Gathering.Services
                 _gatheringService = null;
             }
 
+            _logger = null;
             context.RecordRuntimeState("gathering.serviceLifetime", ServiceLifetime.Scoped.ToString());
+        }
+
+        private void OnPlayerSpawned(GameObject player)
+        {
+            TryAttachToolBehaviour(player);
+        }
+
+        private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+        {
+            TryAttachToolBehaviourToActivePlayer();
+        }
+
+        private void TryAttachToolBehaviourToActivePlayer()
+        {
+            if (_spawnService != null && _spawnService.HasActivePlayer)
+            {
+                TryAttachToolBehaviour(_spawnService.ActivePlayer);
+                return;
+            }
+
+            var player = GameObject.Find("Worldforge.Player") ?? GameObject.FindWithTag("Player");
+            if (player != null)
+            {
+                TryAttachToolBehaviour(player);
+            }
+        }
+
+        private void TryAttachToolBehaviour(GameObject playerObject)
+        {
+            if (playerObject == null)
+            {
+                return;
+            }
+
+            try
+            {
+                var toolBehaviour = playerObject.GetComponent<GatheringToolBehaviour>();
+                if (toolBehaviour == null)
+                {
+                    toolBehaviour = playerObject.AddComponent<GatheringToolBehaviour>();
+                }
+
+                var inventory = playerObject.GetComponent<PlayerInventoryBehaviour>();
+                if (inventory != null && !toolBehaviour.HasEquippedTool)
+                {
+                    inventory.AutoEquipTool();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.Error("Gameplay.Gathering", "Failed to attach or configure GatheringToolBehaviour.", ex);
+            }
         }
     }
 
