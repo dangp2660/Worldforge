@@ -133,12 +133,22 @@ namespace Worldforge.Infrastructure.Development
             HandleShortcut(keyboard, Settings.ReportBootstrapStateKey, "bootstrap.report");
             HandleShortcut(keyboard, Settings.ReloadSceneKey, "scene.reload");
             HandleShortcut(keyboard, Settings.ToggleGizmosKey, "debug.gizmos.toggle");
+            HandleShortcut(keyboard, Settings.ToggleMethodTesterKey, "debug.methodtester.toggle");
+            HandleShortcut(keyboard, Key.F12, "debug.methodtester.toggle");
             HandleShortcut(keyboard, Settings.QuitSessionKey, "application.quit");
         }
 
         private void OnGUI()
         {
-            if (!Application.isPlaying || !AreDebugToolsEnabled() || !Settings.EnableOnScreenOverlay)
+            if (!Application.isPlaying || !AreDebugToolsEnabled())
+            {
+                return;
+            }
+
+            // Always draw MethodTesterGUI if open
+            MethodTester.MethodTesterGUI.Instance.DrawGUI();
+
+            if (!Settings.EnableOnScreenOverlay)
             {
                 return;
             }
@@ -339,6 +349,7 @@ namespace Worldforge.Infrastructure.Development
             RegisterCommand(new ReloadSceneCommand());
             RegisterCommand(new ToggleOverlayCommand());
             RegisterCommand(new ToggleGizmosCommand());
+            RegisterCommand(new ToggleMethodTesterCommand());
             RegisterCommand(new QuitApplicationCommand());
 
             builtInCommandsRegistered = true;
@@ -365,7 +376,7 @@ namespace Worldforge.Infrastructure.Development
                 "<b>Worldforge Development Debug</b>",
                 BuildBootstrapSummary(),
                 $"Commands: {commands.Count} | Gizmos: {(Settings.EnableGizmos ? "On" : "Off")} | Overlay: {(Settings.EnableOnScreenOverlay ? "On" : "Off")}",
-                $"{Settings.ToggleOverlayKey} Overlay | {Settings.ReportBootstrapStateKey} Report | {Settings.ReloadSceneKey} Reload | {Settings.ToggleGizmosKey} Gizmos | {Settings.QuitSessionKey} Quit"
+                $"{Settings.ToggleOverlayKey} Overlay | {Settings.ToggleMethodTesterKey} Method Tester | {Settings.ReloadSceneKey} Reload | {Settings.QuitSessionKey} Quit"
             };
 
             return string.Join(Environment.NewLine, overlayLines);
@@ -564,6 +575,25 @@ namespace Worldforge.Infrastructure.Development
             public bool Execute(DevelopmentDebugManager manager)
             {
                 manager.ToggleGizmos();
+                return true;
+            }
+        }
+
+        private sealed class ToggleMethodTesterCommand : IDevelopmentDebugCommand
+        {
+            public string Name
+            {
+                get { return "debug.methodtester.toggle"; }
+            }
+
+            public string Description
+            {
+                get { return "Toggle In-Game Method Tester tool."; }
+            }
+
+            public bool Execute(DevelopmentDebugManager manager)
+            {
+                MethodTester.MethodTesterManager.Instance.ToggleWindow();
                 return true;
             }
         }

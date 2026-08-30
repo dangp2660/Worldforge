@@ -336,7 +336,7 @@ namespace Worldforge.Crafting
             var consumedItems = new List<ItemStack>();
             var producedItems = new List<ItemStack>();
 
-            // Consume ingredients
+            // Phase 1: Consume ingredients
             for (var i = 0; i < recipe.Ingredients.Count; i++)
             {
                 var ingredient = recipe.Ingredients[i];
@@ -351,10 +351,7 @@ namespace Worldforge.Crafting
                     if (!removed)
                     {
                         // Rollback previously consumed ingredients
-                        for (var c = 0; c < consumedItems.Count; c++)
-                        {
-                            inventory.AddItem(consumedItems[c]);
-                        }
+                        RollbackConsumedItems(inventory, consumedItems);
 
                         return CraftingResult.Failure(
                             CraftingFailureReason.MissingIngredients,
@@ -366,7 +363,19 @@ namespace Worldforge.Crafting
                 }
             }
 
-            // Produce outputs
+            // Phase 2: SuccessRate check — ingredients already consumed
+            if (recipe.SuccessRate < 1.0f && UnityEngine.Random.value > recipe.SuccessRate)
+            {
+                var failResult = CraftingResult.Failure(
+                    CraftingFailureReason.CraftFailed,
+                    $"Crafting '{recipe.DisplayName}' failed (success rate {recipe.SuccessRate:P0}). Ingredients were consumed.",
+                    recipe,
+                    consumedItems);
+                CraftingCompleted?.Invoke(failResult);
+                return failResult;
+            }
+
+            // Phase 3: Produce outputs
             if (recipe.Outputs != null)
             {
                 for (var i = 0; i < recipe.Outputs.Count; i++)
@@ -380,12 +389,21 @@ namespace Worldforge.Crafting
                     var shouldYield = output.Probability >= 1.0f || UnityEngine.Random.value <= output.Probability;
                     if (shouldYield)
                     {
-                        var remaining = inventory.AddItem(output.Item, output.Amount);
-                        var actualProduced = output.Amount - remaining;
-                        if (actualProduced > 0)
+                        // AddItem returns the number of items actually added
+                        var actualProduced = inventory.AddItem(output.Item, output.Amount);
+                        if (actualProduced <= 0)
                         {
-                            producedItems.Add(new ItemStack(output.Item, actualProduced));
+                            // Output could not be added — rollback all produced outputs and consumed ingredients
+                            RollbackProducedItems(inventory, producedItems);
+                            RollbackConsumedItems(inventory, consumedItems);
+
+                            return CraftingResult.Failure(
+                                CraftingFailureReason.InsufficientInventorySpace,
+                                $"Failed to add output '{output.Item.DisplayName}' to inventory during transaction. All changes rolled back.",
+                                recipe);
                         }
+
+                        producedItems.Add(new ItemStack(output.Item, actualProduced));
                     }
                 }
             }
@@ -393,6 +411,30 @@ namespace Worldforge.Crafting
             var result = CraftingResult.Success(recipe, producedItems, consumedItems);
             CraftingCompleted?.Invoke(result);
             return result;
+        }
+
+        private static void RollbackConsumedItems(IInventoryContainer inventory, List<ItemStack> consumedItems)
+        {
+            for (var i = 0; i < consumedItems.Count; i++)
+            {
+                var stack = consumedItems[i];
+                if (stack?.Item != null && stack.Quantity > 0)
+                {
+                    inventory.AddItem(stack.Item, stack.Quantity);
+                }
+            }
+        }
+
+        private static void RollbackProducedItems(IInventoryContainer inventory, List<ItemStack> producedItems)
+        {
+            for (var i = 0; i < producedItems.Count; i++)
+            {
+                var stack = producedItems[i];
+                if (stack?.Item != null && stack.Quantity > 0)
+                {
+                    inventory.RemoveItem(stack.Item, stack.Quantity);
+                }
+            }
         }
     }
 

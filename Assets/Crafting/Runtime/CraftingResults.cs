@@ -111,5 +111,21 @@ namespace Worldforge.Crafting
                 Array.Empty<ItemStack>(),
                 Array.Empty<ItemStack>());
         }
+
+        // Overload for SuccessRate failure where ingredients were already consumed
+        public static CraftingResult Failure(
+            CraftingFailureReason reason,
+            string message,
+            RecipeDefinition recipe,
+            IReadOnlyList<ItemStack> consumedIngredients)
+        {
+            return new CraftingResult(
+                false,
+                reason,
+                message,
+                recipe,
+                Array.Empty<ItemStack>(),
+                consumedIngredients);
+        }
     }
 }

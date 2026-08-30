@@ -20,6 +20,7 @@ namespace Worldforge.Infrastructure.Development
         [SerializeField] private Key reportBootstrapStateKey = Key.F2;
         [SerializeField] private Key reloadSceneKey = Key.F3;
         [SerializeField] private Key toggleGizmosKey = Key.F4;
+        [SerializeField] private Key toggleMethodTesterKey = Key.Backquote;
         [SerializeField] private Key quitSessionKey = Key.F10;
 
         [Header("Gizmos")]
@@ -76,6 +77,11 @@ namespace Worldforge.Infrastructure.Development
         public Key ToggleGizmosKey
         {
             get { return toggleGizmosKey; }
+        }
+
+        public Key ToggleMethodTesterKey
+        {
+            get { return toggleMethodTesterKey; }
         }
 
         public Key QuitSessionKey

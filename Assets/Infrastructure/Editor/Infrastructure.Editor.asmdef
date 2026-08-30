@@ -3,7 +3,12 @@
   "rootNamespace": "Worldforge.Infrastructure.Editor",
   "references": [
     "Infrastructure",
+    "Core",
     "Core.Editor",
+    "Crafting",
+    "Inventory",
+    "Item",
+    "Save",
     "Unity.InputSystem"
   ],
   "includePlatforms": [

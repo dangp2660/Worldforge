@@ -7,6 +7,9 @@
     "Gathering",
     "Interaction",
     "Character",
+    "Crafting",
+    "Item",
+    "Save",
     "UnityEngine.UI",
     "Unity.InputSystem"
   ],
