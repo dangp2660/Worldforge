@@ -174,9 +174,9 @@ namespace Worldforge.Infrastructure.Development.MethodTester
                     continue;
                 }
 
-                // Only include methods explicitly designated as primary test methods
+                // Only include methods explicitly designated as test methods
                 var methodAttr = method.GetCustomAttribute<TestMethodAttribute>(true);
-                if (methodAttr == null || !methodAttr.IsPrimary)
+                if (methodAttr == null)
                 {
                     continue;
                 }
@@ -185,7 +185,6 @@ namespace Worldforge.Infrastructure.Development.MethodTester
                 if (methodDesc != null)
                 {
                     descriptor.AllMethods.Add(methodDesc);
-                    descriptor.PrimaryMethods.Add(methodDesc);
                 }
             }
 
@@ -199,8 +198,6 @@ namespace Worldforge.Infrastructure.Development.MethodTester
                 }
                 return string.Compare(a.DisplayName, b.DisplayName, StringComparison.OrdinalIgnoreCase);
             });
-
-            descriptor.PrimaryMethods = descriptor.AllMethods;
 
             return descriptor;
         }
@@ -238,7 +235,6 @@ namespace Worldforge.Infrastructure.Development.MethodTester
             string defaultCategory,
             TestMethodAttribute methodAttr)
         {
-            var isPrimary = methodAttr != null && methodAttr.IsPrimary;
             var displayName = methodAttr?.DisplayName ?? method.Name;
             var description = methodAttr?.Description ?? string.Empty;
             var order = methodAttr?.Order ?? 100;
@@ -252,7 +248,6 @@ namespace Worldforge.Infrastructure.Development.MethodTester
                 DisplayName = displayName,
                 Description = description,
                 Category = category,
-                IsPrimary = isPrimary,
                 Order = order
             };
 

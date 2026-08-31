@@ -16,8 +16,6 @@ namespace Worldforge.Infrastructure.Development.MethodTester
 
         public string SearchText { get; set; } = string.Empty;
 
-        public bool ShowPrimaryOnly { get; set; } = false;
-
         public List<TestServiceDescriptor> Services { get; private set; } = new List<TestServiceDescriptor>();
 
         public TestServiceDescriptor SelectedService { get; set; }
@@ -79,7 +77,7 @@ namespace Worldforge.Infrastructure.Development.MethodTester
             if (firstService != null)
             {
                 SelectedService = firstService;
-                SelectedMethod = firstService.PrimaryMethods.FirstOrDefault() ?? firstService.AllMethods.FirstOrDefault();
+                SelectedMethod = firstService.AllMethods.FirstOrDefault();
             }
             else
             {

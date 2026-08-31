@@ -24,8 +24,6 @@ namespace Worldforge.Infrastructure.Development.MethodTester
         private GUIStyle sidebarStyle;
         private GUIStyle methodItemStyle;
         private GUIStyle selectedMethodItemStyle;
-        private GUIStyle primaryMethodItemStyle;
-        private GUIStyle selectedPrimaryMethodItemStyle;
         private GUIStyle sectionHeaderStyle;
         private GUIStyle consoleBoxStyle;
         private GUIStyle executeButtonStyle;
@@ -38,7 +36,6 @@ namespace Worldforge.Infrastructure.Development.MethodTester
         private Texture2D sidebarBgTex;
         private Texture2D consoleBgTex;
         private Texture2D selectedBgTex;
-        private Texture2D primaryBgTex;
         private Texture2D executeBtnTex;
 
         public void DrawGUI()
@@ -73,7 +70,6 @@ namespace Worldforge.Infrastructure.Development.MethodTester
             sidebarBgTex = MakeColorTex(new Color(0.16f, 0.17f, 0.20f, 0.98f));
             consoleBgTex = MakeColorTex(new Color(0.08f, 0.08f, 0.10f, 1f));
             selectedBgTex = MakeColorTex(new Color(0.24f, 0.38f, 0.60f, 0.9f));
-            primaryBgTex = MakeColorTex(new Color(0.45f, 0.35f, 0.12f, 0.7f));
             executeBtnTex = MakeColorTex(new Color(0.18f, 0.58f, 0.34f, 1f));
 
             windowStyle = new GUIStyle(GUI.skin.window)
@@ -107,17 +103,6 @@ namespace Worldforge.Infrastructure.Development.MethodTester
             {
                 normal = { background = selectedBgTex, textColor = Color.white },
                 fontStyle = FontStyle.Bold
-            };
-
-            primaryMethodItemStyle = new GUIStyle(methodItemStyle)
-            {
-                normal = { background = primaryBgTex, textColor = new Color(1f, 0.88f, 0.45f) },
-                fontStyle = FontStyle.Bold
-            };
-
-            selectedPrimaryMethodItemStyle = new GUIStyle(primaryMethodItemStyle)
-            {
-                normal = { background = selectedBgTex, textColor = Color.white }
             };
 
             sectionHeaderStyle = new GUIStyle(GUI.skin.label)
@@ -229,7 +214,7 @@ namespace Worldforge.Infrastructure.Development.MethodTester
 
             foreach (var service in manager.Services)
             {
-                var methodsToDisplay = service.PrimaryMethods;
+                var methodsToDisplay = service.AllMethods;
                 if (!string.IsNullOrEmpty(filter))
                 {
                     methodsToDisplay = methodsToDisplay
@@ -258,18 +243,8 @@ namespace Worldforge.Infrastructure.Development.MethodTester
                     foreach (var method in methodsToDisplay)
                     {
                         var isSelected = manager.SelectedMethod == method;
-                        var prefix = method.IsPrimary ? "⭐ " : "   ";
-                        var btnLabel = $"{prefix}{method.DisplayName}";
-
-                        GUIStyle styleToUse;
-                        if (method.IsPrimary)
-                        {
-                            styleToUse = isSelected ? selectedPrimaryMethodItemStyle : primaryMethodItemStyle;
-                        }
-                        else
-                        {
-                            styleToUse = isSelected ? selectedMethodItemStyle : methodItemStyle;
-                        }
+                        var btnLabel = method.DisplayName;
+                        var styleToUse = isSelected ? selectedMethodItemStyle : methodItemStyle;
 
                         if (GUILayout.Button(btnLabel, styleToUse))
                         {
@@ -324,8 +299,7 @@ namespace Worldforge.Infrastructure.Development.MethodTester
             GUILayout.BeginVertical(GUI.skin.box);
             GUILayout.BeginHorizontal();
 
-            var tag = method.IsPrimary ? "⭐ [PRIMARY TEST METHOD]" : "[METHOD]";
-            GUILayout.Label($"{tag} {method.TargetType?.Name}.{method.DisplayName}", sectionHeaderStyle);
+            GUILayout.Label($"[METHOD] {method.TargetType?.Name}.{method.DisplayName}", sectionHeaderStyle);
             GUILayout.EndHorizontal();
 
             // Signature

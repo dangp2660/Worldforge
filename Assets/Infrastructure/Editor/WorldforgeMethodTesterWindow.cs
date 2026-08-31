@@ -46,8 +46,6 @@ namespace Worldforge.Infrastructure.Editor.MethodTester
 
         // GUI Styles
         private GUIStyle headerStyle;
-        private GUIStyle primaryMethodStyle;
-        private GUIStyle selectedPrimaryMethodStyle;
         private GUIStyle logEntryStyle;
         private GUIStyle logWarnStyle;
         private GUIStyle logErrorStyle;
@@ -185,7 +183,7 @@ namespace Worldforge.Infrastructure.Editor.MethodTester
             if (selectedMethod == null && services.Count > 0)
             {
                 selectedService = services[0];
-                selectedMethod = selectedService.PrimaryMethods.FirstOrDefault() ?? selectedService.AllMethods.FirstOrDefault();
+                selectedMethod = selectedService.AllMethods.FirstOrDefault();
             }
         }
 
@@ -201,20 +199,6 @@ namespace Worldforge.Infrastructure.Editor.MethodTester
             {
                 fontSize = 11,
                 normal = { textColor = new Color(0.9f, 0.9f, 0.9f) }
-            };
-
-            primaryMethodStyle ??= new GUIStyle(EditorStyles.miniButton)
-            {
-                alignment = TextAnchor.MiddleLeft,
-                fontStyle = FontStyle.Bold,
-                normal = { textColor = new Color(1f, 0.85f, 0.35f) }
-            };
-
-            selectedPrimaryMethodStyle ??= new GUIStyle(EditorStyles.miniButtonMid)
-            {
-                alignment = TextAnchor.MiddleLeft,
-                fontStyle = FontStyle.Bold,
-                normal = { textColor = Color.white }
             };
 
             logEntryStyle ??= new GUIStyle(EditorStyles.label)
@@ -312,7 +296,7 @@ namespace Worldforge.Infrastructure.Editor.MethodTester
 
             foreach (var service in services)
             {
-                var methodsToDisplay = service.PrimaryMethods;
+                var methodsToDisplay = service.AllMethods;
                 if (!string.IsNullOrEmpty(filter))
                 {
                     methodsToDisplay = methodsToDisplay
@@ -340,12 +324,8 @@ namespace Worldforge.Infrastructure.Editor.MethodTester
                     foreach (var method in methodsToDisplay)
                     {
                         var isSelected = selectedMethod == method;
-                        var prefix = method.IsPrimary ? "⭐ " : "   ";
-                        var btnText = $"{prefix}{method.DisplayName}";
-
-                        var style = method.IsPrimary
-                            ? (isSelected ? selectedPrimaryMethodStyle : primaryMethodStyle)
-                            : (isSelected ? EditorStyles.miniButtonMid : EditorStyles.miniButton);
+                        var btnText = method.DisplayName;
+                        var style = isSelected ? EditorStyles.miniButtonMid : EditorStyles.miniButton;
 
                         if (GUILayout.Button(btnText, style))
                         {
@@ -403,8 +383,7 @@ namespace Worldforge.Infrastructure.Editor.MethodTester
         {
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
 
-            var tag = selectedMethod.IsPrimary ? "⭐ [PRIMARY TEST METHOD]" : "[METHOD]";
-            EditorGUILayout.LabelField($"{tag} {selectedMethod.TargetType?.Name}.{selectedMethod.DisplayName}", headerStyle);
+            EditorGUILayout.LabelField($"[METHOD] {selectedMethod.TargetType?.Name}.{selectedMethod.DisplayName}", headerStyle);
             EditorGUILayout.SelectableLabel(selectedMethod.SignatureText, EditorStyles.boldLabel, GUILayout.Height(20));
 
             if (!string.IsNullOrEmpty(selectedMethod.Description))

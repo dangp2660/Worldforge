@@ -58,8 +58,6 @@ namespace Worldforge.Infrastructure.Development.MethodTester
 
         public string Category { get; set; }
 
-        public bool IsPrimary { get; set; }
-
         public int Order { get; set; }
 
         public List<TestMethodParameterInfo> Parameters { get; set; } = new List<TestMethodParameterInfo>();
@@ -80,8 +78,6 @@ namespace Worldforge.Infrastructure.Development.MethodTester
         public string Description { get; set; }
 
         public int Order { get; set; }
-
-        public List<TestMethodDescriptor> PrimaryMethods { get; set; } = new List<TestMethodDescriptor>();
 
         public List<TestMethodDescriptor> AllMethods { get; set; } = new List<TestMethodDescriptor>();
 

@@ -28,8 +28,7 @@ namespace Worldforge.Core.Attributes
 
     /// <summary>
     /// Marks a method for in-game testing.
-    /// Allows designating whether this is a primary test method (highlighted/starred)
-    /// and configuring custom display name, description, and order.
+    /// Allows configuring custom display name, description, order, and category.
     /// </summary>
     [AttributeUsage(AttributeTargets.Method, Inherited = true, AllowMultiple = false)]
     public sealed class TestMethodAttribute : Attribute
@@ -38,21 +37,17 @@ namespace Worldforge.Core.Attributes
 
         public string Description { get; set; }
 
-        public bool IsPrimary { get; set; }
-
         public int Order { get; set; }
 
         public string Category { get; set; }
 
         public TestMethodAttribute(
             string displayName = null,
-            bool isPrimary = true,
             int order = 0,
             string description = null,
             string category = null)
         {
             DisplayName = displayName;
-            IsPrimary = isPrimary;
             Order = order;
             Description = description;
             Category = category;

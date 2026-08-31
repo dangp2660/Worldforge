@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b1aae3700491d644d9f7f664d7cb81c2, type: 3}
+  m_Name: StructureDefinitionRegistry
+  m_EditorClassIdentifier: Building::Worldforge.Building.StructureDefinitionRegistry
+  _definitions:
+  - {fileID: 11400000, guid: ba0d72114ad4dc14689f93029be18e1c, type: 2}
+  - {fileID: 11400000, guid: a3e5a65d6e0d21f45bb205515b0491e1, type: 2}
+  - {fileID: 11400000, guid: 3056d2d81e6221744a3339c3807dc678, type: 2}
+  - {fileID: 11400000, guid: 3b5edc6dded7a6d41b3b24f93b3af024, type: 2}
+  - {fileID: 11400000, guid: d22772e4e55f2744b958a9a0d46f226a, type: 2}
+  - {fileID: 11400000, guid: 77204292c5f5f9641b653178838380a5, type: 2}

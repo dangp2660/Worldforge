@@ -91,7 +91,7 @@ namespace Worldforge.Item
             SyncFromItemDefinition();
         }
 
-        [TestMethod(DisplayName = "Equip Tool", IsPrimary = true, Order = 1, Description = "Equips a tool item definition")]
+        [TestMethod(DisplayName = "Equip Tool", Order = 1, Description = "Equips a tool item definition")]
         public bool EquipTool(ItemDefinition toolItem)
         {
             if (toolItem == null || !toolItem.IsTool)
@@ -105,7 +105,7 @@ namespace Worldforge.Item
             return true;
         }
 
-        [TestMethod(DisplayName = "Unequip Tool", IsPrimary = true, Order = 2, Description = "Unequips current tool and resets to None")]
+        [TestMethod(DisplayName = "Unequip Tool", Order = 2, Description = "Unequips current tool and resets to None")]
         public void UnequipTool()
         {
             _toolItem = null;
@@ -117,7 +117,6 @@ namespace Worldforge.Item
             ToolChanged?.Invoke(null);
         }
 
-        [TestMethod(DisplayName = "Configure Custom Tool", IsPrimary = false, Description = "Configures custom gathering tool properties directly")]
         public void Configure(ToolType toolType, float harvestPower, float efficiency = 1f, int toolTier = 1, float durabilityCost = 1f)
         {
             _toolItem = null;
