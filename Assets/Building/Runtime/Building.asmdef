@@ -4,7 +4,8 @@
   "references": [
     "Core",
     "Item",
-    "Inventory"
+    "Inventory",
+    "Unity.InputSystem"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],

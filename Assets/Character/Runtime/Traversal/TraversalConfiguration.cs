@@ -47,9 +47,6 @@ namespace Worldforge.Character.Traversal
             get { return _defaultSurfaceTraversable; }
         }
 
-        /// <summary>
-        /// Returns the traversal rule for a given surface type, or null if no rule is defined.
-        /// </summary>
         public SurfaceTraversalRule GetRuleForSurface(SurfaceType surfaceType)
         {
             if (_surfaceRules == null)

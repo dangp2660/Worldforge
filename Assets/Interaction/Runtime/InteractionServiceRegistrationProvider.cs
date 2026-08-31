@@ -6,11 +6,7 @@ using Worldforge.Core.Services;
 
 namespace Worldforge.Interaction
 {
-    /// <summary>
-    /// Registers <see cref="IInteractionService"/> into the DI container.
-    /// Order 135 — runs after CharacterState (130).
-    /// Auto-discovered via reflection by <c>ServiceRegistrationDiscovery</c>.
-    /// </summary>
+
     public sealed class InteractionServiceRegistrationProvider : IServiceRegistrationProvider
     {
         private const string ConfigurationResourcePath = "InteractionConfiguration";

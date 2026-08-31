@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using UnityEditor;
 using UnityEngine;
+using Worldforge.Building;
 using Worldforge.Core.Attributes;
 using Worldforge.Core.Bootstrap;
 using Worldforge.Crafting;
@@ -37,6 +38,7 @@ namespace Worldforge.Infrastructure.Editor.MethodTester
 
         // Edit Mode Simulation State
         private ICraftingService editModeCraftingService;
+        private IBuildingPlacementService editModeBuildingPlacementService;
         private IInventoryContainer editModeInventory;
         private ItemDefinition testItemToAdd;
         private int testItemAmount = 10;
@@ -113,6 +115,7 @@ namespace Worldforge.Infrastructure.Editor.MethodTester
                 craftingService.RegisterRecipe(r);
             }
             editModeCraftingService = craftingService;
+            editModeBuildingPlacementService = new Worldforge.Building.RuntimeBuildingPlacementService(null);
 
             // Setup Edit Mode Test Inventory Container
             editModeInventory = new InventoryContainer("EditModeTestInventory", slotCount: 30, maxWeight: 150f);
@@ -163,6 +166,18 @@ namespace Worldforge.Infrastructure.Editor.MethodTester
                     if (craftingDesc != null)
                     {
                         services.Add(craftingDesc);
+                    }
+                }
+
+                if (editModeBuildingPlacementService != null)
+                {
+                    var buildingDesc = DynamicMethodScanner.CreateServiceDescriptor(
+                        typeof(Worldforge.Building.IBuildingPlacementService),
+                        editModeBuildingPlacementService,
+                        typeof(Worldforge.Building.IBuildingPlacementService).GetCustomAttribute<TestTargetAttribute>(true));
+                    if (buildingDesc != null)
+                    {
+                        services.Add(buildingDesc);
                     }
                 }
 

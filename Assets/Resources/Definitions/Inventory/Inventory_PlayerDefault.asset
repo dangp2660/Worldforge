@@ -21,8 +21,4 @@ MonoBehaviour:
   _allowSort: 1
   _allowStack: 1
   _allowQuickMove: 1
-  _startingItems:
-  - _item: {fileID: 11400000, guid: a1000000000000000000000000000004, type: 2}
-    _amount: 1
-  - _item: {fileID: 11400000, guid: a100000000000000000000000000000f, type: 2}
-    _amount: 3
+  _startingItems: []

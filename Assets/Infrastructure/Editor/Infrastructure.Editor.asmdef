@@ -6,6 +6,7 @@
     "Core",
     "Core.Editor",
     "Crafting",
+    "Building",
     "Inventory",
     "Item",
     "Save",

@@ -9,6 +9,7 @@
     "Character",
     "Crafting",
     "Item",
+    "Building",
     "Save",
     "UnityEngine.UI",
     "Unity.InputSystem"
